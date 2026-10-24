@@ -1,0 +1,41 @@
+// Configuración compartida del proyecto (SÍ se sube a git: no contiene secretos).
+//
+// Los valores propios de cada desarrollador (Team ID, prefijo del bundle, iCloud)
+// van en Config/Local.xcconfig, que está en .gitignore. Copiá
+// Local.xcconfig.example como Local.xcconfig y completalo.
+
+// ── Valores por defecto (Local.xcconfig los pisa porque se incluye DESPUÉS) ──
+DEVELOPMENT_TEAM =
+BUNDLE_ID_PREFIX = dev.local
+MNEMO_ICLOUD = NO
+
+// El "?" hace que el include sea opcional: sin el archivo el proyecto igual compila.
+#include? "Local.xcconfig"
+
+PRODUCT_NAME = Mnemo
+PRODUCT_BUNDLE_IDENTIFIER = $(BUNDLE_ID_PREFIX).mnemo
+
+IPHONEOS_DEPLOYMENT_TARGET = 18.0
+MACOSX_DEPLOYMENT_TARGET = 15.0
+SUPPORTED_PLATFORMS = iphoneos iphonesimulator macosx
+TARGETED_DEVICE_FAMILY = 1,2
+
+SWIFT_VERSION = 6.0
+SWIFT_STRICT_CONCURRENCY = complete
+// El código marca explícitamente con @MainActor lo que va en el hilo principal.
+SWIFT_DEFAULT_ACTOR_ISOLATION = nonisolated
+
+// Seguridad de la app en Mac: sandbox + hardened runtime.
+ENABLE_APP_SANDBOX = YES
+ENABLE_HARDENED_RUNTIME = YES
+ENABLE_USER_SELECTED_FILES = readwrite
+
+// ── iCloud: solo se piden los permisos si MNEMO_ICLOUD = YES ──
+// (con una cuenta gratuita de Apple no se pueden firmar apps con iCloud).
+MNEMO_ENTITLEMENTS_YES_IOS = Config/Mnemo-iCloud-iOS.entitlements
+MNEMO_ENTITLEMENTS_YES_MAC = Config/Mnemo-iCloud-macOS.entitlements
+MNEMO_ENTITLEMENTS_NO_IOS =
+MNEMO_ENTITLEMENTS_NO_MAC =
+CODE_SIGN_ENTITLEMENTS[sdk=iphoneos*] = $(MNEMO_ENTITLEMENTS_$(MNEMO_ICLOUD)_IOS)
+CODE_SIGN_ENTITLEMENTS[sdk=iphonesimulator*] = $(MNEMO_ENTITLEMENTS_$(MNEMO_ICLOUD)_IOS)
+CODE_SIGN_ENTITLEMENTS[sdk=macosx*] = $(MNEMO_ENTITLEMENTS_$(MNEMO_ICLOUD)_MAC)

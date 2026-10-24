@@ -1,0 +1,21 @@
+// PLANTILLA. Copiala como "Local.xcconfig" (en esta misma carpeta) y completala.
+// (scripts/build.sh la copia sola la primera vez y te avisa.)
+// Local.xcconfig está en .gitignore: tus datos de cuenta no se suben al repositorio.
+//
+// Estos valores no son contraseñas (Apple los considera públicos), pero
+// mantenerlos fuera del repo es buena práctica.
+
+// Tu Team ID de Apple (10 caracteres). Dónde verlo:
+// - Cuenta paga: https://developer.apple.com/account → Membership details.
+// - Cuenta gratuita: Xcode → Settings → Accounts → tu Apple ID → el equipo
+//   "(Personal Team)"; o corré `scripts/build.sh team` y te lo muestra.
+DEVELOPMENT_TEAM = XXXXXXXXXX
+
+// Prefijo único para el identificador de la app (dominio invertido, sin espacios).
+// Resultado: com.tunombre.mnemo
+BUNDLE_ID_PREFIX = com.tunombre
+
+// Sincronización por iCloud entre dispositivos.
+// YES solo si tenés Apple Developer Program (pago). Con cuenta gratuita dejalo en NO:
+// la app funciona igual, pero cada dispositivo guarda sus datos por separado.
+MNEMO_ICLOUD = NO

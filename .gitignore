@@ -1,0 +1,41 @@
+# ── Configuración local y secretos (NUNCA se suben) ──
+Config/Local.xcconfig
+*.env
+.env*
+*.p12
+*.p8
+*.pem
+*.cer
+*.mobileprovision
+*.provisionprofile
+GoogleService-Info.plist
+Secrets.swift
+secrets.*
+
+# ── Xcode ──
+xcuserdata/
+*.xcuserstate
+*.xcscmblueprint
+DerivedData/
+build/
+*.ipa
+*.dSYM.zip
+*.dSYM
+*.xcarchive
+
+# ── Swift Package Manager ──
+.build/
+.swiftpm/
+
+# ── macOS ──
+.DS_Store
+
+# ── Generados por scripts/build.sh (XcodeGen) ──
+Mnemo.xcodeproj/
+Mnemo/Resources/Info.plist
+
+# ── Versión web: generados ──
+web/dist/
+web/dist-preview/
+web/test-results/
+web/node_modules/

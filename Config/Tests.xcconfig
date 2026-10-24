@@ -1,0 +1,11 @@
+// Configuración del target de tests: toma tu Team ID de Local.xcconfig (que no se sube).
+DEVELOPMENT_TEAM =
+BUNDLE_ID_PREFIX = dev.local
+#include? "Local.xcconfig"
+
+PRODUCT_NAME = MnemoTests
+PRODUCT_BUNDLE_IDENTIFIER = $(BUNDLE_ID_PREFIX).mnemo.tests
+SWIFT_VERSION = 6.0
+SWIFT_DEFAULT_ACTOR_ISOLATION = nonisolated
+// Los tests no usan iCloud.
+CODE_SIGN_ENTITLEMENTS =
