@@ -29,8 +29,18 @@ export function newId() {
   return Array.from(bytes, (b) => b.toString(16).padStart(2, '0')).join('');
 }
 
+/** Colecciones que se guardan y se sincronizan. */
+export const COLLECTIONS = Object.freeze(['decks', 'cards', 'sessions', 'quizzes']);
+
 export function emptyState() {
-  return { decks: [], cards: [], sessions: [] };
+  return { decks: [], cards: [], sessions: [], quizzes: [] };
+}
+
+/** Completa colecciones que falten (datos guardados por versiones anteriores). */
+export function withAllCollections(state) {
+  const out = {};
+  for (const key of COLLECTIONS) out[key] = Array.isArray(state?.[key]) ? state[key] : [];
+  return out;
 }
 
 export function newDeck({ name, languageCode }, now) {
@@ -62,6 +72,14 @@ export function newCard(fields, now) {
 
 export function newSession(now) {
   return { id: newId(), startedAt: now, endedAt: null, pomodoros: 0, updatedAt: now };
+}
+
+/**
+ * Cuestionario: preguntas que se responden escribiendo.
+ * questions: [{ prompt, answers: string[], note }]
+ */
+export function newQuiz({ name, questions = [] }, now) {
+  return { id: newId(), name, questions, createdAt: now, updatedAt: now };
 }
 
 export function tombstone(record, now) {
@@ -147,9 +165,9 @@ export function mergeStates(local, incoming) {
   let added = 0;
   let updated = 0;
   const result = {};
-  for (const key of ['decks', 'cards', 'sessions']) {
-    const byId = new Map(local[key].map((r) => [r.id, r]));
-    for (const theirs of incoming[key]) {
+  for (const key of COLLECTIONS) {
+    const byId = new Map((local[key] ?? []).map((r) => [r.id, r]));
+    for (const theirs of incoming[key] ?? []) {
       const mine = byId.get(theirs.id);
       if (!mine) {
         byId.set(theirs.id, theirs);
@@ -167,11 +185,7 @@ export function mergeStates(local, incoming) {
 /** Elimina lápidas más viejas que `maxAge` para que los datos no crezcan sin fin. */
 export function purgeTombstones(state, now, maxAge = TOMBSTONE_MAX_AGE) {
   const keep = (r) => !r.deleted || now - r.updatedAt < maxAge;
-  return {
-    decks: state.decks.filter(keep),
-    cards: state.cards.filter(keep),
-    sessions: state.sessions.filter(keep),
-  };
+  return Object.fromEntries(COLLECTIONS.map((key) => [key, (state[key] ?? []).filter(keep)]));
 }
 
 // ───────────────────────── Datos de ejemplo ─────────────────────────
@@ -191,5 +205,5 @@ export function exampleState(now) {
   const cards = rows.map(([front, back, pronunciation, example, kind], i) =>
     newCard({ deckId: deck.id, front, back, pronunciation, example, kind }, now + i),
   );
-  return { decks: [deck], cards, sessions: [] };
+  return { decks: [deck], cards, sessions: [], quizzes: [] };
 }

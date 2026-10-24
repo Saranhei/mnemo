@@ -44,10 +44,7 @@ export function flush() {
 export async function init(now = Date.now()) {
   const saved = await loadState();
   if (saved && Array.isArray(saved.decks)) {
-    state = M.purgeTombstones(
-      { decks: saved.decks, cards: saved.cards ?? [], sessions: saved.sessions ?? [] },
-      now,
-    );
+    state = M.purgeTombstones(M.withAllCollections(saved), now);
     return { firstRun: false };
   }
   state = M.exampleState(now);
@@ -59,6 +56,7 @@ const findLive = (list, id) => list.find((r) => r.id === id && !r.deleted) ?? nu
 export const getDeck = (id) => findLive(state.decks, id);
 export const getCard = (id) => findLive(state.cards, id);
 export const getSession = (id) => findLive(state.sessions, id);
+export const getQuiz = (id) => findLive(state.quizzes, id);
 
 // ───────────────────────────── Mazos ─────────────────────────────
 
@@ -167,6 +165,27 @@ export function deleteSession(id, now = Date.now()) {
 export function inboxDeck(now = Date.now()) {
   const existing = M.live(state.decks).find((d) => d.name === 'Anotaciones');
   return existing ?? createDeck({ name: 'Anotaciones', languageCode: 'en' }, now);
+}
+
+// ──────────────────────────── Cuestionarios ────────────────────────────
+
+export function createQuiz(fields, now = Date.now()) {
+  const quiz = M.newQuiz(fields, now);
+  state.quizzes.push(quiz);
+  commit();
+  return quiz;
+}
+
+export function updateQuiz(id, fields, now = Date.now()) {
+  const quiz = getQuiz(id);
+  if (!quiz) return;
+  Object.assign(quiz, fields, { updatedAt: now });
+  commit();
+}
+
+export function deleteQuiz(id, now = Date.now()) {
+  state.quizzes = state.quizzes.map((q) => (q.id === id ? M.tombstone(q, now) : q));
+  commit();
 }
 
 // ─────────────────────────── Importar / sincronizar ───────────────────────────

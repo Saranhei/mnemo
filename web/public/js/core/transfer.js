@@ -24,6 +24,9 @@ export const LIMITS = Object.freeze({
   cardsPerBackup: 60_000,
   decksPerBackup: 2_000,
   sessionsPerBackup: 20_000,
+  quizzesPerBackup: 2_000,
+  questionsPerQuiz: 2_000,
+  answersPerQuestion: 20,
 });
 
 export const DECK_FORMAT_VERSION = 1;
@@ -130,15 +133,59 @@ export function sanitizeBackup(raw) {
   const decksIn = list(raw.decks);
   const cardsIn = list(raw.cards);
   const sessionsIn = list(raw.sessions);
+  const quizzesIn = list(raw.quizzes);
   if (cardsIn.length > LIMITS.cardsPerBackup) throw errors.tooMany(LIMITS.cardsPerBackup);
-  if (decksIn.length > LIMITS.decksPerBackup || sessionsIn.length > LIMITS.sessionsPerBackup) throw errors.invalid();
+  if (decksIn.length > LIMITS.decksPerBackup || sessionsIn.length > LIMITS.sessionsPerBackup || quizzesIn.length > LIMITS.quizzesPerBackup) {
+    throw errors.invalid();
+  }
 
   const now = Date.now();
   const decks = decksIn.map((d) => sanitizeRecord(d, now, sanitizeDeckRecord)).filter(Boolean);
   const cards = cardsIn.map((c) => sanitizeRecord(c, now, sanitizeCardRecord)).filter(Boolean);
   const sessions = sessionsIn.map((s) => sanitizeRecord(s, now, sanitizeSessionRecord)).filter(Boolean);
-  if (decks.length + cards.length + sessions.length === 0) throw errors.empty();
-  return { decks, cards, sessions };
+  const quizzes = quizzesIn.map((q) => sanitizeRecord(q, now, sanitizeQuizRecord)).filter(Boolean);
+  if (decks.length + cards.length + sessions.length + quizzes.length === 0) throw errors.empty();
+  return { decks, cards, sessions, quizzes };
+}
+
+function sanitizeQuizRecord(q, updatedAt, now) {
+  const name = clean(q.name, MAX_NAME);
+  if (!name) return null;
+  return { id: q.id, name, questions: sanitizeQuestions(q.questions), createdAt: clampDate(q.createdAt, now), updatedAt };
+}
+
+/** Limpia una lista de preguntas: { prompt, answers[], note }. Descarta las incompletas. */
+export function sanitizeQuestions(list) {
+  if (!Array.isArray(list)) return [];
+  const out = [];
+  for (const q of list.slice(0, LIMITS.questionsPerQuiz)) {
+    if (!q || typeof q !== 'object') continue;
+    const prompt = clean(q.prompt);
+    const answers = (Array.isArray(q.answers) ? q.answers : [])
+      .slice(0, LIMITS.answersPerQuestion)
+      .map((a) => clean(a, 200))
+      .filter((a, i, all) => a && all.indexOf(a) === i);
+    if (!prompt || answers.length === 0) continue;
+    out.push({ prompt, answers, note: clean(q.note) });
+  }
+  return out;
+}
+
+/**
+ * Preguntas en texto: una por línea, `pregunta<TAB>respuesta1 / respuesta2[<TAB>nota]`.
+ * Las líneas que empiezan con # se ignoran.
+ */
+export function parseQuestionsText(text) {
+  const rows = [];
+  for (const line of String(text).split(/\r\n|\n|\r/)) {
+    if (!line.trim() || line.startsWith('#')) continue;
+    const [prompt, answers = '', note = ''] = line.split('\t');
+    rows.push({ prompt, answers: answers.split(/\s*[／/]\s*/), note });
+    if (rows.length > LIMITS.questionsPerQuiz) throw errors.tooMany(LIMITS.questionsPerQuiz);
+  }
+  const questions = sanitizeQuestions(rows);
+  if (questions.length === 0) throw new TransferError('empty', 'No encontré preguntas. Usá una por línea: pregunta, TAB, respuestas separadas por /.');
+  return questions;
 }
 
 function sanitizeRecord(r, now, sanitizeLive) {
@@ -237,6 +284,7 @@ export function stateToBackup(state, now) {
     decks: state.decks,
     cards: state.cards,
     sessions: state.sessions,
+    quizzes: state.quizzes ?? [],
   };
 }
 

@@ -11,18 +11,33 @@ import { decksView, deckView } from './views/decks.js';
 import { pomodoroView } from './views/pomodoro.js';
 import { sessionsView, sessionView } from './views/sessions.js';
 import { settingsView, applyTheme } from './views/settings.js';
+import { practiceView } from './views/practice/index.js';
+import { writingView } from './views/practice/writing.js';
+import { quizzesView, quizView } from './views/practice/quizzes.js';
 
 // "preview": versión de prueba publicada dentro de Claude (sin instalación ni descargas).
 const PREVIEW = document.querySelector('meta[name="mnemo-mode"]')?.content === 'preview';
 
 const TABS = [
   { id: 'decks', label: 'Mazos', icon: 'decks', routes: ['decks', 'deck'] },
+  { id: 'practice', label: 'Práctica', icon: 'practice', routes: ['practice', 'write', 'quizzes', 'quiz'] },
   { id: 'pomodoro', label: 'Pomodoro', icon: 'timer', routes: ['pomodoro'] },
   { id: 'sessions', label: 'Sesiones', icon: 'sessions', routes: ['sessions', 'session'] },
   { id: 'settings', label: 'Ajustes', icon: 'settings', routes: ['settings'] },
 ];
 
-const VIEWS = { decks: decksView, deck: deckView, pomodoro: pomodoroView, sessions: sessionsView, session: sessionView, settings: settingsView };
+const VIEWS = {
+  decks: decksView,
+  deck: deckView,
+  practice: practiceView,
+  write: writingView,
+  quizzes: quizzesView,
+  quiz: quizView,
+  pomodoro: pomodoroView,
+  sessions: sessionsView,
+  session: sessionView,
+  settings: settingsView,
+};
 
 let route = { name: readPref('lastTab', 'decks'), params: {} };
 if (!TABS.some((t) => t.id === route.name)) route = { name: 'decks', params: {} };

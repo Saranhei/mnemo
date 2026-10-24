@@ -48,7 +48,28 @@ el ícono de instalar en la barra de direcciones. En Mac con Safari: *Archivo �
 Si la borrás de la pantalla de inicio, se borran sus datos. Exportá una copia antes
 (Ajustes → Exportar copia).
 
-## 3. Pasar las palabras de un dispositivo a otro
+## 3. Práctica
+
+En la pestaña **Práctica**:
+
+- **Escritura:** animación del orden de trazos de cada kana y kanji, su lectura en
+  voz alta, y práctica con el dedo o el Apple Pencil con corrección trazo por trazo.
+- **Preguntas:** cuestionarios por unidad que respondés escribiendo (kana, kanji o
+  romaji). Los cargás a mano, pegás varios desde una planilla o los generás desde un mazo.
+- **Pronunciación:** decí la palabra y fijate si se entendió. En la app instalada en
+  iPhone/iPad, Apple no permite el reconocimiento automático: usá el micrófono del
+  teclado japonés o "Grabarme y comparar". En Safari, la corrección es automática.
+- **Dictado** y **¿Qué escuchaste?:** escuchá palabras en japonés y escribí lo que
+  oíste o elegí qué significan.
+
+Para que la voz suene en japonés, el dispositivo necesita una voz japonesa:
+*Ajustes → Accesibilidad → Contenido leído → Voces → Japonés*. Para el dictado del
+teclado, agregá el teclado japonés (*Ajustes → General → Teclado → Teclados*).
+
+Los trazos son de [KanjiVG](https://kanjivg.tagaini.net) © Ulrich Apel y
+colaboradores, licencia CC BY-SA 3.0 (`public/strokes/LICENSE.txt`).
+
+## 4. Pasar las palabras de un dispositivo a otro
 
 No hay servidor ni cuentas, así que nadie más ve tus datos. La sincronización se hace con un archivo:
 
@@ -63,7 +84,7 @@ en los dos sentidos y las veces que quieras.
 También importa mazos de Anki (*Archivo → Exportar → Notas en texto plano*, .txt) y
 los .json exportados por la app nativa.
 
-## 4. Limitaciones frente a la app nativa
+## 5. Limitaciones frente a la app nativa
 
 | | Web | Nativa |
 |---|---|---|
@@ -71,7 +92,7 @@ los .json exportados por la app nativa.
 | Aviso del Pomodoro con la app cerrada | No: el celular pausa las apps web en segundo plano. Por eso mantiene la pantalla encendida mientras corre | Sí, con notificación |
 | Instalación | Desde Safari, sin Mac ni cuenta | Con Xcode y una Mac |
 
-## 5. Para desarrollar
+## 6. Para desarrollar
 
 Requiere Node 20 o más nuevo. No usa dependencias externas en la app.
 
@@ -80,6 +101,7 @@ npm test                     # pruebas de la lógica (SM-2, Pomodoro, importaci�
 npm run build                # arma dist/ (para publicar) y dist-preview/
 npm run serve                # sirve dist/ en http://localhost:5173 con las cabeceras de producción
 node tests/e2e.mjs capturas  # prueba en navegador real (requiere: npm i -D playwright)
+node tests/e2e-practice.mjs capturas [mazos.json]   # prueba de la sección Práctica
 ```
 
 Cada vez que cambies algo, corré `npm run build` y volvé a subir `dist/`. Los

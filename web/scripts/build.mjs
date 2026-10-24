@@ -18,8 +18,9 @@ const PUBLIC = join(ROOT, 'public');
 const DIST = join(ROOT, 'dist');
 const PREVIEW = join(ROOT, 'dist-preview');
 
-// Archivos que no hace falta guardar para el modo sin conexión.
-const NOT_CACHED = [/\.txt$/, /^_headers$/];
+// Archivos que no se guardan al instalar. Los trazos de kanji (6 MB) se guardan
+// de a uno a medida que se usan (ver sw.template.js); los de kana sí van siempre.
+const NOT_CACHED = [/\.txt$/, /^_headers$/, /^strokes\/(?!030\.json$)/];
 
 async function walk(dir) {
   const out = [];

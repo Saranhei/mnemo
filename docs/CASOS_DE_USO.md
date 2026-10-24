@@ -142,3 +142,56 @@ Son preferencias de cada dispositivo.
 ## CU-11 · Ver el estado de iCloud
 
 En **Ajustes ▸ Sincronización** se ve si hay una cuenta de iCloud activa.
+
+---
+
+# Versión web: Práctica
+
+| ID | Caso de uso | Pantalla | Código principal |
+|---|---|---|---|
+| CU-12 | Practicar la escritura de un kana o kanji | Práctica → Escritura | `views/practice/writing.js`, `core/strokes.js` |
+| CU-13 | Crear, importar o generar un cuestionario | Práctica → Preguntas | `views/practice/quizzes.js`, `core/transfer.js` |
+| CU-14 | Responder un cuestionario escribiendo | Práctica → Preguntas | `runQuiz`, `core/japanese.js` |
+| CU-15 | Practicar pronunciación | Práctica → Pronunciación | `views/practice/audio.js`, `services/voice.js` |
+| CU-16 | Practicar comprensión auditiva | Práctica → Dictado / ¿Qué escuchaste? | `views/practice/audio.js` |
+
+## CU-12 · Practicar la escritura
+
+1. En **Práctica → Escritura**, elegir el conjunto: hiragana, katakana (con o sin ゛゜) o los kanji de un mazo.
+2. Tocar un carácter (o **Practicar en orden** / **Al azar**).
+3. Se muestra la animación del orden de trazos, con el número de cada uno, y se escucha cómo se lee.
+4. Dibujar los trazos en orden con el dedo o el Apple Pencil. Cada trazo correcto queda en color; uno incorrecto se marca en rojo y se explica por qué (posición u orden, o dirección invertida). Después de dos errores en el mismo trazo, se muestra cuál era.
+5. Al terminar: "¡Perfecto!", "¡Bien!" o "Repetilo", y **Siguiente**.
+
+Opciones: **Guía** (mostrar u ocultar el carácter de fondo), **Ver trazos**, **Escuchar**, **Reintentar**. Teclado: espacio = animación, ← → = anterior/siguiente.
+**Sin conexión:** los kana siempre; un kanji, si ya se practicó alguna vez con internet.
+
+## CU-13 · Crear un cuestionario
+
+- **Nuevo:** nombre (por ejemplo "Genki L3") y después **Pregunta** para agregar de a una: la pregunta, las respuestas válidas (una por línea) y una nota opcional.
+- **Importar texto:** pegar o elegir un archivo con una pregunta por línea: `pregunta⇥respuesta1 / respuesta2⇥nota`. Sirve copiar dos o tres columnas de una planilla.
+- **Desde un mazo:** elegir el mazo y qué hay que escribir (la palabra en japonés o el significado). Se crea una pregunta por tarjeta; después se puede editar.
+
+## CU-14 · Responder un cuestionario
+
+1. **Practicar**: las preguntas salen en orden aleatorio.
+2. Escribir la respuesta y **Comprobar** (Enter). Se acepta kana, kanji o romaji, sin importar mayúsculas, tildes ni espacios.
+3. Se muestra si está bien y la respuesta esperada. **No sé** muestra la respuesta.
+4. Las falladas vuelven al final. El resumen muestra cuántas estuvieron bien a la primera y cuáles repasar.
+
+## CU-15 · Practicar pronunciación
+
+1. Elegir mazo y cantidad. Se muestra la palabra (kanji, lectura y significado).
+2. **Escuchar modelo** reproduce la voz japonesa del sistema.
+3. Según dónde se use:
+   - **Safari / Chrome:** **Decirlo** → se escucha al usuario y se indica si se entendió la palabra y qué se escuchó.
+   - **App instalada en iPhone/iPad** (Apple no permite el reconocimiento ahí): tocar el campo y usar el micrófono del teclado japonés; o **Grabarme**, escuchar la grabación junto al modelo y marcar **Me salió bien** o **Repetir**.
+
+**Privacidad:** el reconocimiento automático lo hace el navegador (Apple o Google) y puede enviar el audio a sus servidores; "Grabarme" no envía nada.
+
+## CU-16 · Practicar comprensión auditiva
+
+- **Dictado:** se escucha la palabra (con **Más lento** y repetir) y se escribe en kana o romaji.
+- **¿Qué escuchaste?:** se escucha la palabra y se elige el significado entre cuatro opciones (teclas 1–4).
+
+Si falta la voz japonesa en el dispositivo, la app indica cómo descargarla.
