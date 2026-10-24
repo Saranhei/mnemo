@@ -6,7 +6,11 @@ Mac, ni una cuenta de Apple Developer. Se publica una vez en internet y después
 se instala desde Safari como si fuera una app: tiene su ícono, se abre a pantalla
 completa y funciona sin conexión.
 
-## 1. Publicarla (una sola vez, gratis, unos 5 minutos)
+> **Ya publicada en:** <https://saranhei.github.io/mnemo/>. Se actualiza sola con
+> cada push a `main` que toque `web/` (ver `.github/workflows/pages.yml`): corre las
+> pruebas, arma la app y la publica. Si una prueba falla, no se publica nada.
+
+## 1. Publicarla en otro lado (opcional)
 
 Lo que se publica es la carpeta **`mnemo-web`** que viene en el zip `Mnemo-web-para-publicar.zip`
 (o la carpeta `dist/` si la armás vos con `npm run build`).
