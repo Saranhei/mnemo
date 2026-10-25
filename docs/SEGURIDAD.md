@@ -55,6 +55,7 @@ Todo archivo importado se trata como potencialmente malicioso (`DeckTransfer`):
 | Valores desconocidos (tipo, género) | Se normalizan a valores válidos |
 | Versión de formato desconocida | Se rechaza con un mensaje claro |
 | Nombre de archivo con rutas (`../`) al exportar | Se filtran a letras, números, `-`, `_` y espacios |
+| (Web) Audio/video de un ejercicio de listening | Solo tipos `audio/*` y `video/*`, hasta 60 MB de audio y 90 MB de archivo; se guarda como `Blob` local y se reproduce con un `blob:` URL propio (CSP `media-src 'self' blob:`). Nunca se sube a ningún servidor |
 | Acceso a archivos fuera del sandbox | Solo archivos que el usuario elige, con `startAccessingSecurityScopedResource` |
 
 ## Plataforma

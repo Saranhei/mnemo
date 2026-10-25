@@ -30,8 +30,8 @@ export function decksView(ctx) {
         : `${plural(totalDue, 'tarjeta', 'tarjetas')} para repasar en ${plural(decksWithDue, 'mazo', 'mazos')}.`;
 
   const onImport = async () => {
-    const id = await importFlow(ctx);
-    if (id) ctx.navigate('deck', { id });
+    const next = await importFlow(ctx);
+    if (next) ctx.navigate(next.route, { id: next.id });
   };
 
   return h(

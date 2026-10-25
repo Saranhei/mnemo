@@ -38,6 +38,9 @@ test('Respuestas: variantes con paréntesis, varios significados y 〜', () => {
   assert.deepEqual(answerVariants('すき（な）').sort(), ['すき', 'すきな'].sort());
   assert.ok(matchesAnswer('suki', ['すき（な）']));
   assert.ok(matchesAnswer('すきな', ['すき（な）']));
+  assert.ok(matchesAnswer('watashi wa gakusei desu', ['わたしはがくせいです']), 'partícula wa en romaji');
+  assert.ok(matchesAnswer('wa', ['は']));
+  assert.ok(!matchesAnswer('wa', ['わ', 'を'].slice(1)));
   assert.ok(matchesAnswer('Comer', ['comer; tomar']));
   assert.ok(matchesAnswer('tomar', ['comer; tomar']));
   assert.ok(matchesAnswer('estación', ['estacion']));

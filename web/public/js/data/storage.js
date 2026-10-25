@@ -7,6 +7,7 @@
 
 const DB_NAME = 'mnemo';
 const STORE = 'kv';
+const MEDIA = 'media'; // audios y videos de los ejercicios de listening
 const STATE_KEY = 'state';
 const LS_KEY = 'mnemo.state';
 
@@ -18,8 +19,12 @@ function openDB() {
   if (dbPromise) return dbPromise;
   dbPromise = new Promise((resolve, reject) => {
     if (!('indexedDB' in globalThis)) return reject(new Error('IndexedDB no disponible'));
-    const req = indexedDB.open(DB_NAME, 1);
-    req.onupgradeneeded = () => req.result.createObjectStore(STORE);
+    const req = indexedDB.open(DB_NAME, 2);
+    req.onupgradeneeded = () => {
+      const db = req.result;
+      if (!db.objectStoreNames.contains(STORE)) db.createObjectStore(STORE);
+      if (!db.objectStoreNames.contains(MEDIA)) db.createObjectStore(MEDIA);
+    };
     req.onsuccess = () => resolve(req.result);
     req.onerror = () => reject(req.error);
     req.onblocked = () => reject(new Error('IndexedDB bloqueada'));
@@ -27,12 +32,12 @@ function openDB() {
   return dbPromise;
 }
 
-function idbRequest(mode_, fn) {
+function idbRequest(mode_, fn, storeName = STORE) {
   return openDB().then(
     (db) =>
       new Promise((resolve, reject) => {
-        const tx = db.transaction(STORE, mode_);
-        const req = fn(tx.objectStore(STORE));
+        const tx = db.transaction(storeName, mode_);
+        const req = fn(tx.objectStore(storeName));
         tx.oncomplete = () => resolve(req.result);
         tx.onerror = () => reject(tx.error);
         tx.onabort = () => reject(tx.error);
@@ -78,6 +83,7 @@ export async function saveState(state) {
 export async function clearAll() {
   try {
     await idbRequest('readwrite', (s) => s.delete(STATE_KEY));
+    await idbRequest('readwrite', (s) => s.clear(), MEDIA);
   } catch {
     /* sin IndexedDB no hay nada que borrar ahí */
   }
@@ -89,6 +95,30 @@ export async function clearAll() {
 }
 
 export const storageMode = () => mode;
+
+// ─────────── Archivos de audio/video (solo en este dispositivo, no se sincronizan) ───────────
+
+/** Guarda un archivo. Lanza un error si el navegador no tiene IndexedDB o lugar. */
+export async function putMedia(id, blob) {
+  await idbRequest('readwrite', (s) => s.put(blob, id), MEDIA);
+}
+
+/** @returns {Promise<Blob | null>} */
+export async function getMedia(id) {
+  try {
+    return (await idbRequest('readonly', (s) => s.get(id), MEDIA)) ?? null;
+  } catch {
+    return null;
+  }
+}
+
+export async function deleteMedia(id) {
+  try {
+    await idbRequest('readwrite', (s) => s.delete(id), MEDIA);
+  } catch {
+    /* si no estaba, no hay nada que borrar */
+  }
+}
 
 /**
  * Pide al navegador que no borre los datos cuando le falte espacio.

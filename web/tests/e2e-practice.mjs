@@ -104,11 +104,13 @@ console.log('iPad (1180×820)');
   const n = await drawStrokes(page, 'あ');
   assert.equal(n, 3);
   await page.waitForSelector('.write__status--ok');
+  await page.waitForSelector('.board__tick');
+  assert.equal(await page.locator('.board__ink-stroke.is-right').count(), 3, 'los trazos bien hechos quedan en verde');
   await shot(page, 'p04-ipad-escritura-bien');
 
-  step('escritura: trazo equivocado en い');
-  await page.locator('#write-next').click();
-  await page.waitForSelector('.board');
+  step('escritura: pasa sola a い y trazo equivocado');
+  await page.waitForFunction(() => document.querySelector('.write__char')?.textContent.includes('い'), null, { timeout: 4000 });
+  await page.waitForTimeout(400);
   await drawStrokes(page, 'い', { wrong: true });
   await page.waitForFunction(() => /no coincide|dirección/.test(document.querySelector('.write__status')?.textContent ?? ''));
   await shot(page, 'p05-ipad-escritura-mal');
@@ -149,19 +151,8 @@ console.log('iPad (1180×820)');
     await shot(page, 'p09-ipad-pregunta-mal');
     await page.keyboard.press('Escape');
 
-    step('dictado');
-    await page.locator('.nav__item[data-tab="practice"]').click();
-    await page.getByRole('button', { name: /Dictado/ }).click();
-    await page.selectOption('#src-deck', { index: 1 });
-    await page.getByRole('button', { name: 'Empezar', exact: true }).click();
-    await page.waitForSelector('#dict-answer');
-    await page.fill('#dict-answer', 'zzz');
-    await page.keyboard.press('Enter');
-    await page.waitForSelector('.feedback--bad');
-    await shot(page, 'p10-ipad-dictado');
-    await page.keyboard.press('Escape');
-
     step('¿qué escuchaste?');
+    await page.locator('.nav__item[data-tab="practice"]').click();
     await page.getByRole('button', { name: /Qué escuchaste/ }).click();
     await page.getByRole('button', { name: 'Empezar', exact: true }).click();
     await page.waitForSelector('.option');
@@ -185,6 +176,35 @@ console.log('iPad (1180×820)');
     await shot(page, 'p12-ipad-pronunciacion');
     await page.keyboard.press('Escape');
   }
+
+  step('listening: ejemplos, completar, preguntas y dictado completo');
+  await page.locator('.nav__item[data-tab="practice"]').click();
+  await page.getByRole('button', { name: /Listening/ }).click();
+  await page.getByRole('button', { name: 'Agregar ejemplos', exact: true }).click();
+  await page.waitForSelector('.quiz-row');
+  assert.equal(await page.locator('.quiz-row').count(), 3);
+  await shot(page, 'p10-ipad-listening-lista');
+  await page.locator('.quiz-row', { hasText: 'わたしの いちにち' }).getByRole('button', { name: 'Practicar' }).click();
+  await page.waitForSelector('.cloze__input');
+  const blanks = await page.locator('.cloze__input').count();
+  assert.equal(blanks, 7);
+  await page.fill('#cloze-1', 'okimasu');
+  await page.getByRole('button', { name: 'Comprobar', exact: true }).click();
+  await page.waitForSelector('.cloze__input.is-right');
+  await shot(page, 'p10b-ipad-listening-completar');
+  await page.getByRole('tab', { name: 'Preguntas' }).click();
+  await page.fill('#lq-0', 'shichiji');
+  await page.fill('#lq-1', 'ともだち');
+  await page.getByRole('button', { name: 'Comprobar', exact: true }).click();
+  await page.waitForSelector('.lq .feedback--ok');
+  await shot(page, 'p10c-ipad-listening-preguntas');
+  await page.getByRole('tab', { name: 'Dictado completo' }).click();
+  await page.fill('#ld-text', 'わたしは まいにち しちじに おきます。あさごはんを たべて');
+  await page.getByRole('button', { name: 'Comprobar', exact: true }).click();
+  await page.waitForSelector('.diff');
+  await shot(page, 'p10d-ipad-listening-dictado');
+  await page.keyboard.press('Escape');
+
   await ctx.close();
 }
 

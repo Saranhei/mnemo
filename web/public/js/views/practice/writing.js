@@ -20,9 +20,20 @@ const svgEl = (tag, attrs = {}) => {
   return el;
 };
 
+// ───────────────────────────── Idiomas ─────────────────────────────
+// Cada idioma define sus conjuntos de caracteres y de dónde salen los trazos.
+// Para sumar otro (chino, coreano...), agregar una entrada acá con su fuente de trazos.
+
+const WRITING_LANGUAGES = [{ code: 'ja', label: 'Japonés', sets: japaneseSets, loadStrokes }];
+
+function currentLanguage() {
+  const code = readPref('writeLang', 'ja');
+  return WRITING_LANGUAGES.find((l) => l.code === code) ?? WRITING_LANGUAGES[0];
+}
+
 // ───────────────────────────── Conjuntos de caracteres ─────────────────────────────
 
-function characterSets() {
+function japaneseSets() {
   const sets = [
     { id: 'hiragana', label: 'Hiragana', chars: HIRAGANA.map((k) => k.char) },
     { id: 'hiragana-d', label: 'Hiragana ゛゜', chars: HIRAGANA_DAKUTEN.map((k) => k.char) },
@@ -30,7 +41,7 @@ function characterSets() {
     { id: 'katakana-d', label: 'Katakana ゛゜', chars: KATAKANA_DAKUTEN.map((k) => k.char) },
   ];
   const state = store.getState();
-  for (const deck of liveDecks(state)) {
+  for (const deck of liveDecks(state).filter((d) => d.languageCode.startsWith('ja'))) {
     const chars = charactersFromCards(deckCards(state, deck.id));
     if (chars.length) sets.push({ id: `deck:${deck.id}`, label: deck.name, chars, deck: true });
   }
@@ -70,8 +81,9 @@ function recordResult(ch, mistakes) {
 let currentSet = 'hiragana';
 
 export function writingView(ctx) {
-  const sets = characterSets();
-  if (!sets.some((s) => s.id === currentSet)) currentSet = 'hiragana';
+  const language = currentLanguage();
+  const sets = language.sets();
+  if (!sets.some((s) => s.id === currentSet)) currentSet = sets[0].id;
   const set = sets.find((s) => s.id === currentSet);
   const st = stats();
 
@@ -83,6 +95,24 @@ export function writingView(ctx) {
       subtitle: 'Tocá un carácter para ver cómo se escribe y practicarlo. Con Apple Pencil, la palma no molesta.',
       back: { label: 'Práctica', onClick: () => ctx.navigate('practice') },
     }),
+    h(
+      'label',
+      { class: 'lang-picker', for: 'write-lang' },
+      h('span', { class: 'field__label' }, 'Idioma'),
+      h(
+        'select',
+        {
+          class: 'input',
+          id: 'write-lang',
+          onChange: (e) => {
+            writePref('writeLang', e.target.value);
+            currentSet = null;
+            ctx.refresh();
+          },
+        },
+        WRITING_LANGUAGES.map((l) => h('option', { value: l.code, selected: l.code === language.code }, l.label)),
+      ),
+    ),
     h(
       'div',
       { class: 'set-chips', role: 'tablist', 'aria-label': 'Conjunto de caracteres' },
@@ -138,6 +168,8 @@ function openWriting(ctx, chars, start) {
   let guide = readPref('writeGuide', true);
   let results = { done: 0, perfect: 0 };
   let board = null;
+  let advanceTimer = null;
+  const cancelAdvance = () => clearTimeout(advanceTimer);
 
   const layer = openLayer({
     title: 'Escritura',
@@ -150,10 +182,14 @@ function openWriting(ctx, chars, start) {
         board?.animate();
       }
     },
-    onClose: () => board?.destroy(),
+    onClose: () => {
+      cancelAdvance();
+      board?.destroy();
+    },
   });
 
   const go = (delta) => {
+    cancelAdvance();
     const next = index + delta;
     if (next < 0) return;
     if (next >= chars.length) return showSummary();
@@ -200,7 +236,7 @@ function openWriting(ctx, chars, start) {
         h('button', { class: 'btn btn--ghost', type: 'button', onClick: () => board?.animate() }, icon('play', { size: 18 }), 'Ver trazos'),
         h('button', { class: 'btn btn--ghost', type: 'button', disabled: !info.speak, onClick: () => sayJapanese(info.speak) }, icon('speaker', { size: 18 }), 'Escuchar'),
         guideBtn,
-        h('button', { class: 'btn btn--ghost', type: 'button', onClick: () => board?.restart() }, icon('reset', { size: 18 }), 'Reintentar'),
+        h('button', { class: 'btn btn--ghost', type: 'button', onClick: () => (cancelAdvance(), board?.restart()) }, icon('reset', { size: 18 }), 'Reintentar'),
       ),
       h(
         'div',
@@ -219,7 +255,7 @@ function openWriting(ctx, chars, start) {
     });
 
     if (info.speak) sayJapanese(info.speak);
-    const strokes = await loadStrokes(ch);
+    const strokes = await currentLanguage().loadStrokes(ch);
     if (chars[index] !== ch) return; // el usuario ya pasó a otro
     if (!strokes) {
       status.textContent = navigator.onLine ? 'No hay datos de trazos para este carácter.' : 'Sin conexión: este kanji todavía no se descargó.';
@@ -232,9 +268,12 @@ function openWriting(ctx, chars, start) {
         recordResult(ch, mistakes);
         results.done += 1;
         if (mistakes === 0) results.perfect += 1;
-        status.textContent = mistakes === 0 ? '¡Perfecto! Sin errores.' : mistakes <= 2 ? `¡Bien! Con ${plural(mistakes, 'error', 'errores')}.` : `Terminado con ${mistakes} errores. Repetilo para fijarlo.`;
-        status.className = `write__status write__status--${mistakes === 0 ? 'ok' : mistakes <= 2 ? 'warn' : 'bad'}`;
-        document.getElementById('write-next')?.focus({ preventScroll: true });
+        status.textContent = mistakes === 0 ? '¡Perfecto! Sin errores.' : `¡Bien! Con ${plural(mistakes, 'error', 'errores')}.`;
+        status.className = `write__status write__status--${mistakes === 0 ? 'ok' : 'warn'}`;
+        // Pasa solo al siguiente después de mostrar el tick (se cancela si tocás algo).
+        advanceTimer = setTimeout(() => {
+          if (chars[index] === ch && layer.body.isConnected) go(1);
+        }, 1400);
       },
     });
     board.animate();
@@ -351,13 +390,21 @@ function createBoard(host, strokes, { guide, onStatus, onDone }) {
     }
     const result = compareStroke(points, refs[current]);
     if (result.ok) {
-      line.remove();
-      doneLayer.appendChild(svgEl('path', { d: strokes[current], class: 'board__done-stroke' }));
+      // Tu trazo queda, en verde, con un tick chico al final.
+      line.classList.add('is-right');
+      doneLayer.appendChild(line);
+      const end = points.at(-1);
+      const tick = svgEl('path', { d: `M${end.x + 2},${end.y - 1} l2.2,2.4 l4.4,-5`, class: 'board__mini-tick' });
+      doneLayer.appendChild(tick);
+      setTimeout(() => tick.remove(), 700);
       current += 1;
       missesOnStroke = 0;
       if (current === strokes.length) {
         finished = true;
         svg.classList.add('is-finished');
+        const big = svgEl('g', { class: 'board__tick' });
+        big.append(svgEl('circle', { cx: 92, cy: 17, r: 11 }), svgEl('path', { d: 'M86.5,17.5 l4,4 l7.5,-9' }));
+        svg.appendChild(big);
         onDone(mistakes);
       } else status();
     } else {
@@ -401,6 +448,7 @@ function createBoard(host, strokes, { guide, onStatus, onDone }) {
       missesOnStroke = 0;
       finished = false;
       svg.classList.remove('is-finished');
+      svg.querySelector('.board__tick')?.remove();
       status();
     },
     destroy() {

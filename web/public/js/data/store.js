@@ -7,7 +7,7 @@
 import * as M from '../core/model.js';
 import { schedule } from '../core/sm2.js';
 import { insertDeckExport } from '../core/transfer.js';
-import { loadState, saveState, clearAll } from './storage.js';
+import { loadState, saveState, clearAll, deleteMedia } from './storage.js';
 
 let state = M.emptyState();
 const listeners = new Set();
@@ -57,6 +57,7 @@ export const getDeck = (id) => findLive(state.decks, id);
 export const getCard = (id) => findLive(state.cards, id);
 export const getSession = (id) => findLive(state.sessions, id);
 export const getQuiz = (id) => findLive(state.quizzes, id);
+export const getListening = (id) => findLive(state.listenings, id);
 
 // ───────────────────────────── Mazos ─────────────────────────────
 
@@ -185,6 +186,29 @@ export function updateQuiz(id, fields, now = Date.now()) {
 
 export function deleteQuiz(id, now = Date.now()) {
   state.quizzes = state.quizzes.map((q) => (q.id === id ? M.tombstone(q, now) : q));
+  commit();
+}
+
+// ──────────────────────────── Listening ────────────────────────────
+
+export function createListening(fields, now = Date.now()) {
+  const listening = M.newListening(fields, now);
+  state.listenings.push(listening);
+  commit();
+  return listening;
+}
+
+export function updateListening(id, fields, now = Date.now()) {
+  const listening = getListening(id);
+  if (!listening) return;
+  Object.assign(listening, fields, { updatedAt: now });
+  commit();
+}
+
+export function deleteListening(id, now = Date.now()) {
+  const listening = getListening(id);
+  if (listening?.mediaId) deleteMedia(listening.mediaId);
+  state.listenings = state.listenings.map((l) => (l.id === id ? M.tombstone(l, now) : l));
   commit();
 }
 

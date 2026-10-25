@@ -25,6 +25,10 @@ export const LIMITS = Object.freeze({
   decksPerBackup: 2_000,
   sessionsPerBackup: 20_000,
   quizzesPerBackup: 2_000,
+  listeningsPerBackup: 2_000,
+  listeningFileBytes: 90 * 1024 * 1024,
+  mediaBytes: 60 * 1024 * 1024,
+  transcriptChars: 20_000,
   questionsPerQuiz: 2_000,
   answersPerQuestion: 20,
 });
@@ -64,7 +68,7 @@ export function parseImport(text, filename, byteSize = text.length) {
     return { kind: 'deck', deck: parseTabSeparated(text, base) };
   }
   if (ext !== 'json') throw errors.type();
-  if (byteSize > LIMITS.backupFileBytes) throw errors.tooLarge();
+  if (byteSize > LIMITS.listeningFileBytes) throw errors.tooLarge();
 
   let raw;
   try {
@@ -72,6 +76,10 @@ export function parseImport(text, filename, byteSize = text.length) {
   } catch {
     throw errors.invalid();
   }
+  if (raw && raw.app === 'mnemo' && raw.type === 'listening') {
+    return { kind: 'listening', ...sanitizeListeningFile(raw) };
+  }
+  if (byteSize > LIMITS.backupFileBytes) throw errors.tooLarge();
   if (raw && raw.app === 'mnemo' && raw.type === 'backup') {
     return { kind: 'backup', state: sanitizeBackup(raw) };
   }
@@ -134,6 +142,8 @@ export function sanitizeBackup(raw) {
   const cardsIn = list(raw.cards);
   const sessionsIn = list(raw.sessions);
   const quizzesIn = list(raw.quizzes);
+  const listeningsIn = list(raw.listenings);
+  if (listeningsIn.length > LIMITS.listeningsPerBackup) throw errors.invalid();
   if (cardsIn.length > LIMITS.cardsPerBackup) throw errors.tooMany(LIMITS.cardsPerBackup);
   if (decksIn.length > LIMITS.decksPerBackup || sessionsIn.length > LIMITS.sessionsPerBackup || quizzesIn.length > LIMITS.quizzesPerBackup) {
     throw errors.invalid();
@@ -144,8 +154,70 @@ export function sanitizeBackup(raw) {
   const cards = cardsIn.map((c) => sanitizeRecord(c, now, sanitizeCardRecord)).filter(Boolean);
   const sessions = sessionsIn.map((s) => sanitizeRecord(s, now, sanitizeSessionRecord)).filter(Boolean);
   const quizzes = quizzesIn.map((q) => sanitizeRecord(q, now, sanitizeQuizRecord)).filter(Boolean);
-  if (decks.length + cards.length + sessions.length + quizzes.length === 0) throw errors.empty();
-  return { decks, cards, sessions, quizzes };
+  const listenings = listeningsIn.map((l) => sanitizeRecord(l, now, sanitizeListeningRecord)).filter(Boolean);
+  if (decks.length + cards.length + sessions.length + quizzes.length + listenings.length === 0) throw errors.empty();
+  return { decks, cards, sessions, quizzes, listenings };
+}
+
+const LEVEL_IDS = ['easy', 'medium', 'hard'];
+const MEDIA_TYPE = /^(audio|video)\/[a-z0-9.+-]{1,40}$/i;
+
+/** Campos de contenido de un ejercicio de listening (sin ids ni archivo). */
+function sanitizeListeningContent(l) {
+  const title = clean(l.title, MAX_NAME);
+  if (!title) return null;
+  return {
+    title,
+    level: LEVEL_IDS.includes(l.level) ? l.level : 'medium',
+    language: sanitizeLanguage(l.language ?? 'ja'),
+    transcript: clean(l.transcript, LIMITS.transcriptChars),
+    reading: clean(l.reading, LIMITS.transcriptChars),
+    note: clean(l.note),
+    questions: sanitizeQuestions(l.questions),
+  };
+}
+
+function sanitizeListeningRecord(l, updatedAt, now) {
+  const content = sanitizeListeningContent(l);
+  if (!content) return null;
+  const hasMedia = isValidId(l.mediaId);
+  return {
+    id: l.id,
+    ...content,
+    mediaId: hasMedia ? l.mediaId : null,
+    mediaName: hasMedia ? clean(l.mediaName, 200) : '',
+    mediaType: hasMedia && MEDIA_TYPE.test(l.mediaType ?? '') ? l.mediaType : '',
+    example: l.example === true,
+    createdAt: clampDate(l.createdAt, now),
+    updatedAt,
+  };
+}
+
+/**
+ * Archivo de un ejercicio compartido: { app, type: "listening", version, listening, media }.
+ * media = { name, type, data (base64) } o null. Solo se aceptan audio y video.
+ */
+function sanitizeListeningFile(raw) {
+  const version = typeof raw.version === 'number' ? raw.version : 1;
+  if (version > 1) throw errors.version(version);
+  const listening = sanitizeListeningContent(raw.listening ?? {});
+  if (!listening) throw errors.invalid();
+  const m = raw.media;
+  const media =
+    m && typeof m === 'object' && typeof m.data === 'string' && MEDIA_TYPE.test(m.type ?? '') && /^[A-Za-z0-9+/=\s]+$/.test(m.data.slice(0, 2000))
+      ? { name: clean(m.name, 200) || 'audio', type: m.type, data: m.data }
+      : null;
+  if (media && media.data.length * 0.75 > LIMITS.mediaBytes) throw errors.tooLarge();
+  return { listening, media };
+}
+
+export function listeningToFile(listening, media) {
+  const { title, level, language, transcript, reading, note, questions } = listening;
+  return { app: 'mnemo', type: 'listening', version: 1, listening: { title, level, language, transcript, reading, note, questions }, media };
+}
+
+export function listeningFileName(title) {
+  return `${fileSafeName(title)}.mnemo-listening.json`;
 }
 
 function sanitizeQuizRecord(q, updatedAt, now) {
@@ -285,6 +357,7 @@ export function stateToBackup(state, now) {
     cards: state.cards,
     sessions: state.sessions,
     quizzes: state.quizzes ?? [],
+    listenings: state.listenings ?? [],
   };
 }
 

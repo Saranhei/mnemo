@@ -183,16 +183,23 @@ export function answerVariants(answer) {
 }
 
 /** ¿La respuesta escrita coincide con alguna de las aceptadas? */
+/** En romaji, las partículas sueltas "wa", "e" y "o" se escriben は, へ y を. */
+const ROMAJI_PARTICLE = { wa: 'は', e: 'へ', o: 'を' };
+function romajiParticles(text) {
+  return text.replace(/(^|\s)(wa|e|o)(?=\s|$)/gi, (_, sp, p) => sp + ROMAJI_PARTICLE[p.toLowerCase()]);
+}
+
 export function matchesAnswer(input, accepted) {
   const raw = String(input ?? '').trim();
   if (!raw) return false;
   const inJa = japaneseKey(raw);
   const inEs = spanishKey(raw);
   const inDigits = japaneseKey(digitsVariant(raw.normalize('NFKC')));
+  const inParticles = japaneseKey(romajiParticles(raw));
   for (const answer of accepted) {
     for (const v of answerVariants(answer)) {
       const ja = japaneseKey(v);
-      if (ja && (ja === inJa || japaneseKey(digitsVariant(v)) === inDigits)) return true;
+      if (ja && (ja === inJa || ja === inParticles || japaneseKey(digitsVariant(v)) === inDigits)) return true;
       if (spanishKey(v) && spanishKey(v) === inEs) return true;
     }
   }

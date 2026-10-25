@@ -1,4 +1,5 @@
-// Pronunciación (micrófono) y comprensión auditiva (dictado y "¿qué significa?").
+// Pronunciación (micrófono) y "¿Qué escuchaste?" (palabras sueltas).
+// Los ejercicios con textos largos están en listening.js.
 
 import { h, icon, clear } from '../../ui/dom.js';
 import { field } from '../../ui/components.js';
@@ -15,7 +16,6 @@ import {
 
 export const MODES = {
   speak: { title: 'Pronunciación', needs: (i) => i.readings.length > 0 || i.kanji },
-  dictation: { title: 'Dictado', needs: (i) => i.readings.length > 0 },
   meaning: { title: '¿Qué escuchaste?', needs: (i) => (i.readings.length > 0 || i.kanji) && i.meaning },
 };
 
@@ -53,7 +53,7 @@ export function openSourceSheet(ctx, mode) {
             writePref('source.count', n);
             const items = n ? shuffle(src.items).slice(0, n) : src.items;
             close();
-            const run = { speak: runSpeak, dictation: runDictation, meaning: runMeaning }[mode];
+            const run = { speak: runSpeak, meaning: runMeaning }[mode];
             run(ctx, src.deck, items, src.items);
           },
         },
@@ -255,62 +255,6 @@ function runSpeak(ctx, deck, items) {
           if (e.key.toLowerCase() === 'p') sayJapanese(speechText(item));
         },
       };
-    },
-  });
-}
-
-// ───────────────────────────── Dictado ─────────────────────────────
-
-function runDictation(ctx, deck, items) {
-  scoreRunner(ctx, {
-    title: `Dictado · ${deck.name}`,
-    items,
-    renderItem: (item, { body, next }) => {
-      const play = (rate) => sayJapanese(speechText(item), { rate });
-      const input = h('input', { class: 'input input--answer', id: 'dict-answer', lang: 'ja', autocomplete: 'off', autocapitalize: 'off', spellcheck: false, placeholder: 'Escribí lo que escuchaste (kana o romaji)', 'aria-label': 'Lo que escuchaste' });
-      const fb = h('div', { class: 'quiz__feedback' });
-      const submit = h('button', { class: 'btn btn--primary', type: 'submit' }, 'Comprobar');
-      let done = null;
-
-      const reveal = (ok, gaveUp = false) => {
-        done = ok;
-        input.disabled = true;
-        clear(fb);
-        fb.append(
-          feedback({ ok, title: ok ? '¡Correcto!' : gaveUp ? 'Era:' : 'No era eso. Era:', lines: [] }),
-          wordBlock(item),
-        );
-        submit.textContent = 'Siguiente';
-        submit.focus({ preventScroll: true });
-      };
-
-      body.append(
-        h(
-          'form',
-          {
-            class: 'quiz audio',
-            novalidate: true,
-            onSubmit: (e) => {
-              e.preventDefault();
-              if (done !== null) return next(done);
-              if (!input.value.trim()) return input.focus();
-              reveal(matchesAnswer(input.value, acceptedForms(item)));
-            },
-          },
-          h(
-            'div',
-            { class: 'row row--center' },
-            h('button', { class: 'btn btn--big-play', type: 'button', 'aria-label': 'Escuchar de nuevo', onClick: () => play(0.9) }, icon('speaker', { size: 30 })),
-            h('button', { class: 'btn btn--ghost', type: 'button', onClick: () => play(0.55) }, 'Más lento'),
-          ),
-          input,
-          h('div', { class: 'row' }, submit, h('button', { class: 'btn btn--ghost', type: 'button', onClick: () => done === null && reveal(false, true) }, 'No sé')),
-          fb,
-        ),
-      );
-      setTimeout(() => play(0.9), 250);
-      requestAnimationFrame(() => input.focus({ preventScroll: true }));
-      return {};
     },
   });
 }

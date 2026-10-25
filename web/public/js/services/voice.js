@@ -23,14 +23,27 @@ export function voicesReady(timeout = 1500) {
   });
 }
 
+/** Voz del sistema para un idioma ("ja", "ko", "de"...). */
+export function voiceFor(language) {
+  if (!('speechSynthesis' in globalThis)) return null;
+  if (language.startsWith('ja')) return japaneseVoice();
+  const prefix = language.toLowerCase().split('-')[0];
+  return speechSynthesis.getVoices().find((v) => v.lang.toLowerCase().replace('_', '-').startsWith(prefix)) ?? null;
+}
+
 /** Lee texto en japonés. Devuelve una promesa que termina al terminar de hablar. */
 export function sayJapanese(text, { rate = 0.9 } = {}) {
+  return say(text, { language: 'ja-JP', rate });
+}
+
+/** Lee texto en el idioma indicado. */
+export function say(text, { language = 'ja-JP', rate = 0.9 } = {}) {
   return new Promise((resolve) => {
     if (!('speechSynthesis' in globalThis) || !text) return resolve(false);
     speechSynthesis.cancel();
     const u = new SpeechSynthesisUtterance(text);
-    u.lang = 'ja-JP';
-    const voice = japaneseVoice();
+    u.lang = language;
+    const voice = voiceFor(language);
     if (voice) u.voice = voice;
     u.rate = rate;
     u.onend = () => resolve(true);

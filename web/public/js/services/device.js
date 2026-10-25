@@ -110,8 +110,11 @@ export async function deliverFile(filename, text, { preview = false } = {}) {
   }
 }
 
-/** Abre el selector de archivos y devuelve { name, size, text } o null si se canceló. */
-export function pickFile(accept) {
+/**
+ * Abre el selector de archivos y devuelve { name, size, type, text?, file } o null si se canceló.
+ * Con `asText: false` no lee el contenido (para audio y video).
+ */
+export function pickFile(accept, { maxBytes = 90 * 1024 * 1024, asText = true } = {}) {
   return new Promise((resolve) => {
     const input = Object.assign(document.createElement('input'), { type: 'file', accept });
     input.hidden = true;
@@ -119,9 +122,10 @@ export function pickFile(accept) {
       const file = input.files?.[0];
       input.remove();
       if (!file) return resolve(null);
+      const info = { name: file.name, size: file.size, type: file.type, file, text: '' };
       // El tamaño se controla ANTES de leer, para no cargar archivos gigantes en memoria.
-      if (file.size > 25 * 1024 * 1024) return resolve({ name: file.name, size: file.size, text: '' });
-      resolve({ name: file.name, size: file.size, text: await file.text() });
+      if (!asText || file.size > maxBytes) return resolve(info);
+      resolve({ ...info, text: await file.text() });
     });
     input.addEventListener('cancel', () => {
       input.remove();

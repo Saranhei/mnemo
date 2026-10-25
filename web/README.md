@@ -52,15 +52,19 @@ Si la borrás de la pantalla de inicio, se borran sus datos. Exportá una copia 
 
 En la pestaña **Práctica**:
 
-- **Escritura:** animación del orden de trazos de cada kana y kanji, su lectura en
-  voz alta, y práctica con el dedo o el Apple Pencil con corrección trazo por trazo.
+- **Escritura:** elegís el idioma (por ahora japonés), ves la animación del orden de
+  trazos de cada kana y kanji, la escuchás, y la practicás con el dedo o el Apple
+  Pencil con corrección trazo por trazo. Si te sale bien, queda en verde con un tick y
+  pasa sola a la siguiente.
 - **Preguntas:** cuestionarios por unidad que respondés escribiendo (kana, kanji o
   romaji). Los cargás a mano, pegás varios desde una planilla o los generás desde un mazo.
 - **Pronunciación:** decí la palabra y fijate si se entendió. En la app instalada en
   iPhone/iPad, Apple no permite el reconocimiento automático: usá el micrófono del
   teclado japonés o "Grabarme y comparar". En Safari, la corrección es automática.
-- **Dictado** y **¿Qué escuchaste?:** escuchá palabras en japonés y escribí lo que
-  oíste o elegí qué significan.
+- **Listening:** textos con tu propio audio o video (mp3, m4a, mp4, mov) y su
+  transcripción, o leídos por la voz del sistema. Según el nivel: completar espacios,
+  responder preguntas o escribir todo el texto siguiendo el audio lento (0,5×).
+- **¿Qué escuchaste?:** escuchá una palabra y elegí qué significa.
 
 Para que la voz suene en japonés, el dispositivo necesita una voz japonesa:
 *Ajustes → Accesibilidad → Contenido leído → Voces → Japonés*. Para el dictado del

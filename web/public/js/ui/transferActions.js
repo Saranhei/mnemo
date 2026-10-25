@@ -3,24 +3,37 @@
 import { h, icon, plural } from './dom.js';
 import { openSheet, confirmAction, toast } from './overlays.js';
 import * as store from '../data/store.js';
-import { parseImport, deckToExport, stateToBackup, deckFileName, backupFileName, TransferError, LIMITS } from '../core/transfer.js';
+import {
+  parseImport, deckToExport, stateToBackup, deckFileName, backupFileName, TransferError, LIMITS, listeningToFile, listeningFileName,
+} from '../core/transfer.js';
 import { live } from '../core/model.js';
 import { deliverFile, pickFile } from '../services/device.js';
+import { putMedia } from '../data/storage.js';
+import { newId } from '../core/model.js';
 
 const ACCEPT = '.json,.txt,.tsv,application/json,text/plain,text/tab-separated-values';
 
-/** Importa un mazo (Mnemo o Anki) o una copia completa. Devuelve el id del mazo si se creó uno. */
+/**
+ * Importa un mazo (Mnemo o Anki), un ejercicio de listening o una copia completa.
+ * @returns {Promise<{route: string, id: string} | null>} a dónde ir después, si corresponde.
+ */
 export async function importFlow(ctx) {
   const file = await pickFile(ACCEPT);
   if (!file) return null;
   try {
-    if (file.size > LIMITS.backupFileBytes) throw new TransferError('tooLarge', 'El archivo es demasiado grande.');
+    if (file.size > LIMITS.listeningFileBytes) throw new TransferError('tooLarge', 'El archivo es demasiado grande.');
     const result = parseImport(file.text, file.name, file.size);
 
     if (result.kind === 'deck') {
       const id = store.importDeck(result.deck);
       toast(`Importado "${result.deck.name}": ${plural(result.deck.cards.length, 'tarjeta', 'tarjetas')}.`, { tone: 'ok' });
-      return id;
+      return { route: 'deck', id };
+    }
+
+    if (result.kind === 'listening') {
+      const id = await saveImportedListening(result);
+      toast(`Importado el ejercicio "${result.listening.title}".`, { tone: 'ok' });
+      return { route: 'listening-edit', id };
     }
 
     const s = result.state;
@@ -55,6 +68,35 @@ export async function exportBackupFlow(ctx) {
   const now = Date.now();
   const backup = stateToBackup(store.getState(), now);
   await deliver(ctx, backupFileName(now), JSON.stringify(backup), 'Copia lista. Abrila en el otro dispositivo con "Importar".');
+}
+
+/** Crea el ejercicio y guarda su audio (que viene en base64) en el dispositivo. */
+export async function saveImportedListening({ listening, media }) {
+  const created = store.createListening(listening);
+  if (media) {
+    const binary = atob(media.data.replace(/\s+/g, ''));
+    const bytes = new Uint8Array(binary.length);
+    for (let i = 0; i < binary.length; i++) bytes[i] = binary.charCodeAt(i);
+    const mediaId = newId();
+    await putMedia(mediaId, new Blob([bytes], { type: media.type }));
+    store.updateListening(created.id, { mediaId, mediaName: media.name, mediaType: media.type });
+  }
+  return created.id;
+}
+
+/** Comparte un ejercicio con su audio adentro (para pasarlo a otro dispositivo o a alguien). */
+export async function exportListeningFlow(ctx, listening, blob) {
+  let media = null;
+  if (blob) {
+    const data = await new Promise((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onload = () => resolve(String(reader.result).split(',')[1] ?? '');
+      reader.onerror = () => reject(reader.error);
+      reader.readAsDataURL(blob);
+    });
+    media = { name: listening.mediaName || 'audio', type: listening.mediaType || blob.type, data };
+  }
+  await deliver(ctx, listeningFileName(listening.title), JSON.stringify(listeningToFile(listening, media)), 'Ejercicio exportado.');
 }
 
 async function deliver(ctx, filename, text, doneMessage) {

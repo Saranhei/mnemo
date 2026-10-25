@@ -153,15 +153,17 @@ En **Ajustes ▸ Sincronización** se ve si hay una cuenta de iCloud activa.
 | CU-13 | Crear, importar o generar un cuestionario | Práctica → Preguntas | `views/practice/quizzes.js`, `core/transfer.js` |
 | CU-14 | Responder un cuestionario escribiendo | Práctica → Preguntas | `runQuiz`, `core/japanese.js` |
 | CU-15 | Practicar pronunciación | Práctica → Pronunciación | `views/practice/audio.js`, `services/voice.js` |
-| CU-16 | Practicar comprensión auditiva | Práctica → Dictado / ¿Qué escuchaste? | `views/practice/audio.js` |
+| CU-16 | Reconocer palabras de oído | Práctica → ¿Qué escuchaste? | `views/practice/audio.js` |
+| CU-17 | Cargar un ejercicio de listening | Práctica → Listening → Nuevo ejercicio | `views/practice/listening.js` |
+| CU-18 | Practicar listening | Práctica → Listening → Practicar | `views/practice/listening.js`, `core/listening.js` |
 
 ## CU-12 · Practicar la escritura
 
-1. En **Práctica → Escritura**, elegir el conjunto: hiragana, katakana (con o sin ゛゜) o los kanji de un mazo.
+1. En **Práctica → Escritura**, elegir el **idioma** (por ahora solo japonés; la lista está preparada para sumar otros) y el conjunto: hiragana, katakana (con o sin ゛゜) o los kanji de un mazo.
 2. Tocar un carácter (o **Practicar en orden** / **Al azar**).
 3. Se muestra la animación del orden de trazos, con el número de cada uno, y se escucha cómo se lee.
 4. Dibujar los trazos en orden con el dedo o el Apple Pencil. Cada trazo correcto queda en color; uno incorrecto se marca en rojo y se explica por qué (posición u orden, o dirección invertida). Después de dos errores en el mismo trazo, se muestra cuál era.
-5. Al terminar: "¡Perfecto!", "¡Bien!" o "Repetilo", y **Siguiente**.
+5. Al terminar bien, el carácter queda dibujado en verde, aparece un tick grande y la app pasa sola al siguiente (1,4 s). Si hubo que repetir, "Repetilo" y queda en el mismo para reintentar. **Siguiente**, **Anterior** o **Reintentar** cancelan el salto automático.
 
 Opciones: **Guía** (mostrar u ocultar el carácter de fondo), **Ver trazos**, **Escuchar**, **Reintentar**. Teclado: espacio = animación, ← → = anterior/siguiente.
 **Sin conexión:** los kana siempre; un kanji, si ya se practicó alguna vez con internet.
@@ -189,9 +191,27 @@ Opciones: **Guía** (mostrar u ocultar el carácter de fondo), **Ver trazos**, *
 
 **Privacidad:** el reconocimiento automático lo hace el navegador (Apple o Google) y puede enviar el audio a sus servidores; "Grabarme" no envía nada.
 
-## CU-16 · Practicar comprensión auditiva
+## CU-16 · Reconocer palabras de oído
 
-- **Dictado:** se escucha la palabra (con **Más lento** y repetir) y se escribe en kana o romaji.
 - **¿Qué escuchaste?:** se escucha la palabra y se elige el significado entre cuatro opciones (teclas 1–4).
 
 Si falta la voz japonesa en el dispositivo, la app indica cómo descargarla.
+
+## CU-17 · Cargar un ejercicio de listening
+
+1. **Práctica → Listening → Nuevo ejercicio** (o **Agregar ejemplos** para tener tres de prueba: fácil, medio y difícil).
+2. Completar: título, nivel (fácil / medio / difícil), idioma.
+3. **Subir audio o video** (mp3, m4a, wav, mp4, mov; hasta 60 MB). Queda guardado solo en este dispositivo. Sin archivo, la app lee el texto con la voz del sistema, frase por frase.
+4. **Transcripción** (obligatoria). Para elegir los espacios a completar, poner las palabras entre corchetes: `私は[学生]です`; otra respuesta válida va con `|`: `[学生|がくせい]`. Sin corchetes, la app elige los espacios según el nivel (fácil: pocos; difícil: muchos).
+5. **Lectura en kana** (opcional): si la transcripción tiene kanji, permite corregir un dictado escrito en kana.
+6. **Preguntas de comprensión** (opcional): una por línea, `pregunta⇥respuesta1 / respuesta2`.
+7. **Exportar** genera un archivo `.mnemo-listening.json` con el audio adentro, para pasarlo a otro dispositivo o a otra persona; se abre con **Ajustes → Importar**.
+
+## CU-18 · Practicar listening
+
+1. **Practicar** abre el reproductor: play/pausa, −5 s (o frase anterior/siguiente con la voz del sistema), y velocidad 0,5× · 0,75× · 1×.
+2. Elegir el ejercicio:
+   - **Completar espacios:** se escribe cada palabra que falta. Al comprobar, las correctas quedan en verde y las incorrectas en rojo con la respuesta como pista.
+   - **Preguntas:** se responden las preguntas de comprensión (aparece solo si el ejercicio tiene).
+   - **Dictado completo:** se escribe todo el texto siguiendo el audio lento. La app muestra el porcentaje y marca en rojo lo que faltó. **Ver transcripción** muestra el texto.
+3. En todos se acepta kana, kanji o romaji (las partículas `wa`, `e`, `o` cuentan como は, へ, を).

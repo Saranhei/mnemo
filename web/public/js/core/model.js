@@ -30,10 +30,10 @@ export function newId() {
 }
 
 /** Colecciones que se guardan y se sincronizan. */
-export const COLLECTIONS = Object.freeze(['decks', 'cards', 'sessions', 'quizzes']);
+export const COLLECTIONS = Object.freeze(['decks', 'cards', 'sessions', 'quizzes', 'listenings']);
 
 export function emptyState() {
-  return { decks: [], cards: [], sessions: [], quizzes: [] };
+  return { decks: [], cards: [], sessions: [], quizzes: [], listenings: [] };
 }
 
 /** Completa colecciones que falten (datos guardados por versiones anteriores). */
@@ -80,6 +80,29 @@ export function newSession(now) {
  */
 export function newQuiz({ name, questions = [] }, now) {
   return { id: newId(), name, questions, createdAt: now, updatedAt: now };
+}
+
+/**
+ * Ejercicio de listening: audio o video propio (guardado aparte, en el dispositivo)
+ * o, si no hay archivo, la voz del sistema leyendo la transcripción.
+ */
+export function newListening(fields, now) {
+  return {
+    id: newId(),
+    title: fields.title,
+    level: fields.level ?? 'medium',
+    language: fields.language ?? 'ja',
+    transcript: fields.transcript ?? '',
+    reading: fields.reading ?? '',
+    note: fields.note ?? '',
+    questions: fields.questions ?? [],
+    mediaId: null,
+    mediaName: '',
+    mediaType: '',
+    example: fields.example === true,
+    createdAt: now,
+    updatedAt: now,
+  };
 }
 
 export function tombstone(record, now) {
@@ -205,5 +228,5 @@ export function exampleState(now) {
   const cards = rows.map(([front, back, pronunciation, example, kind], i) =>
     newCard({ deckId: deck.id, front, back, pronunciation, example, kind }, now + i),
   );
-  return { decks: [deck], cards, sessions: [], quizzes: [] };
+  return { decks: [deck], cards, sessions: [], quizzes: [], listenings: [] };
 }

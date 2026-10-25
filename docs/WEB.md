@@ -91,12 +91,19 @@ web no pueden ejecutar código ni notificar con la pantalla apagada.
 
 ## Práctica
 
-Cinco ejercicios en la pestaña **Práctica**. Los que usan audio o escritura a mano
+Cinco ejercicios en la pestaña **Práctica** (Escritura, Preguntas, Pronunciación, Listening y ¿Qué escuchaste?). Los que usan audio o escritura a mano
 corren en una capa a pantalla completa (`ui/layer.js`), fuera de la pantalla
 principal, así un cambio de datos (por ejemplo, que termine un Pomodoro) no los
 reinicia.
 
 ### Escritura (`views/practice/writing.js`)
+
+- **Idiomas:** `WRITING_LANGUAGES` define, por idioma, sus conjuntos de caracteres y
+  de dónde salen los trazos. Hoy solo japonés; para sumar otro se agrega una entrada
+  con sus datos de trazos. El idioma elegido se recuerda (preferencia `writeLang`).
+- **Bien escrito:** los trazos quedan en verde con un tick chico cada uno; al
+  terminar, tick grande y salto automático al siguiente a los 1,4 s (se cancela si
+  el usuario navega o reintenta).
 
 - **Datos:** los trazos vienen de [KanjiVG](https://kanjivg.tagaini.net) (orden de
   trazos japonés). `scripts/strokes-from-kanjivg.mjs` los guarda en
@@ -127,7 +134,7 @@ desde un mazo (español → japonés o japonés → español). Las preguntas fal
 vuelven a aparecer al final.
 
 **Corrección tolerante** (`core/japanese.js`, `matchesAnswer`): da igual hiragana,
-katakana o romaji (`neko` = `ねこ` = `ネコ`), espacios, puntuación y vocales largas
+katakana o romaji (`neko` = `ねこ` = `ネコ`; las partículas sueltas `wa`, `e`, `o` = は, へ, を), espacios, puntuación y vocales largas
 (`koohii` = `コーヒー`, `sensee` = `せんせい`); en español, mayúsculas y tildes.
 `すき（な）` acepta `すき` y `すきな`; `comer; tomar` acepta cada significado.
 
@@ -146,16 +153,32 @@ Tres formas, porque no todas funcionan en todos lados:
 Lo reconocido se compara con la lectura en kana, el kanji y lo escrito en la
 tarjeta (también `1時` = `一時`).
 
-### Escucha
+### ¿Qué escuchaste? (`views/practice/audio.js`)
 
-- **Dictado:** la voz del sistema dice una palabra; se escribe lo que se oyó.
-  Se puede repetir y escuchar más lento.
-- **¿Qué escuchaste?:** se elige el significado entre cuatro opciones (los otros
-  tres salen del mismo mazo).
+La voz del sistema dice una palabra de un mazo y se elige el significado entre
+cuatro opciones (los otros tres salen del mismo mazo). Si el dispositivo no tiene
+voz japonesa, la app explica cómo instalarla.
 
-Las palabras salen de las tarjetas (`core/practice.js`): de las de vocabulario,
-la lectura en kana, el kanji y el significado; de las de kanji, sus palabras de
-ejemplo. Si el dispositivo no tiene voz japonesa, la app explica cómo instalarla.
+### Listening (`views/practice/listening.js`, `core/listening.js`)
+
+Ejercicios de textos largos (`listenings` en el modelo):
+`{ id, title, level, language, transcript, reading, note, questions[], mediaId, mediaName, mediaType }`.
+
+- **Audio o video propio:** el archivo se guarda como `Blob` en IndexedDB (almacén
+  `media`, base v2), aparte del estado. **No viaja en la copia de seguridad** (sería
+  enorme); para pasarlo se exporta el ejercicio solo (`.mnemo-listening.json`, con el
+  audio en base64, hasta 90 MB). Al importar se valida tipo MIME (solo audio/* y
+  video/*) y tamaño.
+- **Sin archivo:** la voz del sistema lee la transcripción frase por frase
+  (`sentences()`), a la velocidad elegida.
+- **Completar espacios** (`clozeParts`): si la transcripción tiene `[palabra|otra]`,
+  esos son los espacios; si no, se segmenta con `Intl.Segmenter` y se eligen
+  palabras cada 7 / 4 / 2 según el nivel, salteando partículas y puntuación.
+- **Dictado completo** (`compareDictation`): normaliza (kana, sin espacios ni
+  puntuación, romaji → kana, partículas `wa/e/o`) y compara con la transcripción y
+  con la lectura en kana por subsecuencia común más larga; devuelve el porcentaje
+  y qué caracteres faltaron.
+- **Ejemplos** (`listeningExamples.js`): tres textos originales para probar.
 
 ## Modo sin conexión
 
@@ -188,8 +211,9 @@ app se recarga una vez (después de guardar los datos).
 | Archivo | Qué verifica |
 |---|---|
 | `tests/core.test.mjs` | SM-2, Pomodoro, sanitización, consultas, combinación de copias, importación (Anki, nativa, archivos maliciosos) |
+| `tests/listening.test.mjs` | Espacios con corchetes y automáticos por nivel, frases, comparación del dictado, importar/exportar ejercicios (tipos y tamaños) |
 | `tests/practice.test.mjs` | Romaji → kana, corrección tolerante, comparación de trazos (bien, lejos, al revés, puntos), palabras desde tarjetas, cuestionarios en la copia |
-| `tests/e2e-practice.mjs` | En Chromium (iPad horizontal y celular): trazos simulados de あ, い (mal) y 曜, generar y responder preguntas, dictado, "¿qué escuchaste?", pronunciación con dictado del teclado |
+| `tests/e2e-practice.mjs` | En Chromium (iPad horizontal y celular): trazos simulados de あ (tick y salto automático), い (mal) y 曜, generar y responder preguntas, "¿qué escuchaste?", pronunciación con dictado del teclado, listening (completar, preguntas y dictado completo) |
 | `tests/e2e.mjs` | En Chromium a tamaño iPhone (claro) e iPad (oscuro): alta de tarjeta, XSS, repaso con deshacer, Pomodoro y anotación, sesiones, exportar/importar, datos tras recargar, modo sin conexión, sin desbordes horizontales ni errores de consola |
 
 ## Diferencias con la app nativa

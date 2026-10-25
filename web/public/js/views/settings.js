@@ -37,8 +37,8 @@ export function settingsView(ctx) {
             class: 'btn btn--ghost',
             type: 'button',
             onClick: async () => {
-              const id = await importFlow(ctx);
-              if (id) ctx.navigate('deck', { id });
+              const next = await importFlow(ctx);
+              if (next) ctx.navigate(next.route, { id: next.id });
             },
           },
           icon('import', { size: 18 }),
