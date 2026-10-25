@@ -156,13 +156,16 @@ En **Ajustes ▸ Sincronización** se ve si hay una cuenta de iCloud activa.
 | CU-16 | Reconocer palabras de oído | Práctica → ¿Qué escuchaste? | `views/practice/audio.js` |
 | CU-17 | Cargar un ejercicio de listening | Práctica → Listening → Nuevo ejercicio | `views/practice/listening.js` |
 | CU-18 | Practicar listening | Práctica → Listening → Practicar | `views/practice/listening.js`, `core/listening.js` |
+| CU-19 | Armar listas de kanji propias | Práctica → Escritura → Nueva lista / Diccionario | `ui/kanjiLists.js`, `data/store.js` |
+| CU-20 | Escribir kanji de memoria | Práctica → Kanji de memoria | `views/practice/kanjiRecall.js` |
+| CU-21 | Buscar en el diccionario | Diccionario | `views/dictionary.js`, `core/dictionary.js` |
 
 ## CU-12 · Practicar la escritura
 
-1. En **Práctica → Escritura**, elegir el **idioma** (por ahora solo japonés; la lista está preparada para sumar otros) y el conjunto: hiragana, katakana (con o sin ゛゜) o los kanji de un mazo.
+1. En **Práctica → Escritura**, elegir el **idioma** (por ahora solo japonés; la lista está preparada para sumar otros) y el conjunto: hiragana, katakana (con o sin ゛゜), una de tus listas de kanji (CU-19) o los kanji de un mazo.
 2. Tocar un carácter (o **Practicar en orden** / **Al azar**).
 3. Se muestra la animación del orden de trazos, con el número de cada uno, y se escucha cómo se lee.
-4. Dibujar los trazos en orden con el dedo o el Apple Pencil. Cada trazo correcto queda en color; uno incorrecto se marca en rojo y se explica por qué (posición u orden, o dirección invertida). Después de dos errores en el mismo trazo, se muestra cuál era.
+4. Dibujar los trazos en orden con el dedo o el Apple Pencil. Vale aunque la letra salga más chica, corrida o un poco torcida: la app se adapta a tu tamaño de letra después del primer trazo. Cada trazo correcto queda en color; uno incorrecto se marca en rojo y se explica por qué (posición u orden, o dirección invertida). Después de dos errores en el mismo trazo, se muestra cuál era.
 5. Al terminar bien, el carácter queda dibujado en verde, aparece un tick grande y la app pasa sola al siguiente (1,4 s). Si hubo que repetir, "Repetilo" y queda en el mismo para reintentar. **Siguiente**, **Anterior** o **Reintentar** cancelan el salto automático.
 
 Opciones: **Guía** (mostrar u ocultar el carácter de fondo), **Ver trazos**, **Escuchar**, **Reintentar**. Teclado: espacio = animación, ← → = anterior/siguiente.
@@ -215,3 +218,29 @@ Si falta la voz japonesa en el dispositivo, la app indica cómo descargarla.
    - **Preguntas:** se responden las preguntas de comprensión (aparece solo si el ejercicio tiene).
    - **Dictado completo:** se escribe todo el texto siguiendo el audio lento. La app muestra el porcentaje y marca en rojo lo que faltó. **Ver transcripción** muestra el texto.
 3. En todos se acepta kana, kanji o romaji (las partículas `wa`, `e`, `o` cuentan como は, へ, を).
+
+## CU-19 · Armar listas de kanji propias
+
+1. En **Práctica → Escritura**, **Nueva lista**: nombre y los kanji (escritos o pegados; de un texto quedan solo los kanji, sin repetir).
+2. Con la lista elegida: **Agregar kanji** para sumar los que vas aprendiendo, **Editar lista** para renombrar, quitar kanji o borrarla.
+3. Desde el **Diccionario**, en la ficha de un kanji: **Agregar a mis kanji** → elegir la lista (o crear una).
+4. Las listas aparecen en Escritura y en Kanji de memoria, y viajan en la copia de seguridad.
+
+Para Genki I hay un archivo aparte con una lista por lección (L3–L12) y una con todos: se abre con **Ajustes → Importar**.
+
+## CU-20 · Escribir kanji de memoria
+
+1. **Práctica → Kanji de memoria**: elegir de dónde (una lista o los kanji de un mazo), cuántos (10, 20, todos) y el orden (primero los que más cuestan, al azar o el de la lista).
+2. Se muestra el significado y las lecturas on (celeste) y kun (verde). Escribir el kanji en la cuadrícula vacía. La corrección es trazo por trazo y más permisiva que en Escritura.
+3. **Pista** muestra el trazo que sigue; **No me acuerdo** muestra el kanji entero para copiarlo; **Borrar** empieza de nuevo; **Saltar** pasa al siguiente.
+4. Al completarlo aparece un sello: ◎ perfecto, ○ con errores, △ con ayuda, y pasa solo al siguiente.
+5. Resumen: precisión, lista con el sello de cada kanji y **Repetir los que costaron**.
+
+## CU-21 · Buscar en el diccionario
+
+1. Pestaña **Diccionario**. Escribir en kanji (食べる), kana (たべる), romaji (taberu) o el significado (comer, to eat).
+2. Si la búsqueda tiene kanji, arriba aparecen sus fichas; abajo, las palabras (las comunes primero). "EN" = solo tiene traducción al inglés.
+3. Tocar una palabra: lecturas, categoría, todas las acepciones (español e inglés), sus kanji, **Escuchar**, **Agregar a un mazo** (como tarjeta) y enlaces a **Takoboto** y **Jisho**.
+4. Tocar un kanji: significado, lecturas, trazos, nivel JLPT aproximado, palabras de ejemplo, **Practicar escritura** y **Agregar a mis kanji**.
+
+**Sin conexión:** la primera vez se descarga (~1,7 MB); después funciona sin internet.

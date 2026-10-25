@@ -53,7 +53,8 @@ async function drawStrokes(page, ch, { wrong = false } = {}) {
     path.remove();
     return out;
   }, ch);
-  const list = wrong ? [strokes[0].map(([x, y], i) => [x + 0 * i, y + 140])] : strokes;
+  // Equivocado: empezar por el último trazo (orden incorrecto).
+  const list = wrong ? [strokes.at(-1)] : strokes;
   for (const pts of list) {
     await page.mouse.move(pts[0][0], pts[0][1]);
     await page.mouse.down();
@@ -90,7 +91,7 @@ console.log('iPad (1180×820)');
   step('hub de práctica');
   await page.locator('.nav__item[data-tab="practice"]').click();
   await page.waitForSelector('.practice-tile');
-  assert.equal(await page.locator('.practice-tile').count(), 5);
+  assert.equal(await page.locator('.practice-tile').count(), 6);
   await shot(page, 'p01-ipad-practica');
 
   step('escritura: あ bien trazada');
@@ -112,7 +113,7 @@ console.log('iPad (1180×820)');
   await page.waitForFunction(() => document.querySelector('.write__char')?.textContent.includes('い'), null, { timeout: 4000 });
   await page.waitForTimeout(400);
   await drawStrokes(page, 'い', { wrong: true });
-  await page.waitForFunction(() => /no coincide|dirección/.test(document.querySelector('.write__status')?.textContent ?? ''));
+  await page.waitForFunction(() => /no coincide|dirección|después/.test(document.querySelector('.write__status')?.textContent ?? ''));
   await shot(page, 'p05-ipad-escritura-mal');
   await page.keyboard.press('Escape');
 

@@ -58,6 +58,7 @@ export const getCard = (id) => findLive(state.cards, id);
 export const getSession = (id) => findLive(state.sessions, id);
 export const getQuiz = (id) => findLive(state.quizzes, id);
 export const getListening = (id) => findLive(state.listenings, id);
+export const getKanjiSet = (id) => findLive(state.kanjiSets, id);
 
 // ───────────────────────────── Mazos ─────────────────────────────
 
@@ -232,4 +233,36 @@ export async function resetAll() {
   state = M.emptyState();
   commit();
   await flush();
+}
+
+// ──────────────────────────── Listas de kanji ────────────────────────────
+
+export function createKanjiSet(fields, now = Date.now()) {
+  const set = M.newKanjiSet(fields, now);
+  state.kanjiSets.push(set);
+  commit();
+  return set;
+}
+
+export function updateKanjiSet(id, fields, now = Date.now()) {
+  const set = getKanjiSet(id);
+  if (!set) return;
+  if (fields.name !== undefined) set.name = fields.name;
+  if (fields.chars !== undefined) set.chars = M.uniqueKanji(fields.chars);
+  set.updatedAt = now;
+  commit();
+}
+
+/** Suma kanji a una lista (los que ya estaban no se repiten). @returns cuántos eran nuevos. */
+export function addToKanjiSet(id, text, now = Date.now()) {
+  const set = getKanjiSet(id);
+  if (!set) return 0;
+  const before = [...set.chars].length;
+  updateKanjiSet(id, { chars: set.chars + text }, now);
+  return [...set.chars].length - before;
+}
+
+export function deleteKanjiSet(id, now = Date.now()) {
+  state.kanjiSets = state.kanjiSets.map((k) => (k.id === id ? M.tombstone(k, now) : k));
+  commit();
 }

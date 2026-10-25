@@ -11,6 +11,10 @@ const CACHE = `mnemo-${VERSION}`;
 // Trazos de kanji: caché aparte que NO cambia con cada versión de la app, así
 // lo que ya se descargó sigue disponible sin conexión después de actualizar.
 const STROKES_CACHE = 'mnemo-strokes-v1';
+// Diccionario: también aparte. Se usa lo guardado y, si hay internet, se actualiza
+// en segundo plano para la próxima vez.
+const DICT_CACHE = 'mnemo-dict-v1';
+const KEEP = new Set([STROKES_CACHE, DICT_CACHE]);
 
 self.addEventListener('install', (event) => {
   event.waitUntil(
@@ -26,7 +30,7 @@ self.addEventListener('activate', (event) => {
     caches
       .keys()
       .then((keys) =>
-        Promise.all(keys.filter((k) => k.startsWith('mnemo-') && k !== CACHE && k !== STROKES_CACHE).map((k) => caches.delete(k))),
+        Promise.all(keys.filter((k) => k.startsWith('mnemo-') && k !== CACHE && !KEEP.has(k)).map((k) => caches.delete(k))),
       )
       .then(() => self.clients.claim()),
   );
@@ -46,6 +50,26 @@ self.addEventListener('fetch', (event) => {
         const response = await fetch(request);
         if (response.ok) cache.put(request, response.clone());
         return response;
+      }),
+    );
+    return;
+  }
+
+  if (url.pathname.includes('/dict/') && url.pathname.endsWith('.json')) {
+    event.respondWith(
+      caches.open(DICT_CACHE).then(async (cache) => {
+        const cached = await cache.match(request);
+        const update = fetch(request)
+          .then((response) => {
+            if (response.ok) cache.put(request, response.clone());
+            return response;
+          })
+          .catch(() => null);
+        if (cached) {
+          event.waitUntil(update);
+          return cached;
+        }
+        return (await update) ?? Response.error();
       }),
     );
     return;

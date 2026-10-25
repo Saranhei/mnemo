@@ -39,7 +39,7 @@ export async function importFlow(ctx) {
     const s = result.state;
     const ok = await confirmAction({
       title: 'Combinar copia',
-      message: `La copia trae ${plural(live(s.decks).length, 'mazo', 'mazos')}, ${plural(live(s.cards).length, 'tarjeta', 'tarjetas')} y ${plural(live(s.sessions).length, 'sesión', 'sesiones')}. Se suma a lo que ya tenés: de cada tarjeta queda la versión más reciente. No se pierde nada de este dispositivo que sea más nuevo.`,
+      message: `La copia trae ${describeBackup(s)}. Se suma a lo que ya tenés: de cada cosa queda la versión más reciente. No se pierde nada de este dispositivo que sea más nuevo.`,
       confirmLabel: 'Combinar',
       danger: false,
     });
@@ -57,6 +57,22 @@ export async function importFlow(ctx) {
     toast(err instanceof TransferError ? err.message : 'No se pudo leer el archivo.', { tone: 'error', ms: 5000 });
     return null;
   }
+}
+
+/** "3 mazos, 120 tarjetas y 12 listas de kanji" (solo lo que trae). */
+function describeBackup(s) {
+  const parts = [
+    [live(s.decks).length, 'mazo', 'mazos'],
+    [live(s.cards).length, 'tarjeta', 'tarjetas'],
+    [live(s.sessions).length, 'sesión', 'sesiones'],
+    [live(s.quizzes ?? []).length, 'cuestionario', 'cuestionarios'],
+    [live(s.listenings ?? []).length, 'ejercicio de listening', 'ejercicios de listening'],
+    [live(s.kanjiSets ?? []).length, 'lista de kanji', 'listas de kanji'],
+  ]
+    .filter(([n]) => n > 0)
+    .map(([n, one, many]) => plural(n, one, many));
+  if (parts.length === 0) return 'solo registros borrados';
+  return parts.length === 1 ? parts[0] : `${parts.slice(0, -1).join(', ')} y ${parts.at(-1)}`;
 }
 
 export async function exportDeckFlow(ctx, deckId) {

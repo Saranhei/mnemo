@@ -20,7 +20,7 @@ const PREVIEW = join(ROOT, 'dist-preview');
 
 // Archivos que no se guardan al instalar. Los trazos de kanji (6 MB) se guardan
 // de a uno a medida que se usan (ver sw.template.js); los de kana sí van siempre.
-const NOT_CACHED = [/\.txt$/, /^_headers$/, /^strokes\/(?!030\.json$)/];
+const NOT_CACHED = [/\.txt$/, /^_headers$/, /^strokes\/(?!030\.json$)/, /^dict\//];
 
 async function walk(dir) {
   const out = [];

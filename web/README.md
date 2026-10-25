@@ -56,6 +56,11 @@ En la pestaña **Práctica**:
   trazos de cada kana y kanji, la escuchás, y la practicás con el dedo o el Apple
   Pencil con corrección trazo por trazo. Si te sale bien, queda en verde con un tick y
   pasa sola a la siguiente.
+- **Kanji de memoria:** ves el significado y las lecturas y escribís el kanji sin
+  guía; vale aunque salga torcido o chico. Sello ◎ ○ △ por kanji y resumen con tu
+  precisión. Usa tus listas de kanji o los kanji de tus mazos.
+- **Listas de kanji:** en Escritura, "Nueva lista" y "Agregar kanji" para ir sumando
+  los que aprendés (también desde el Diccionario).
 - **Preguntas:** cuestionarios por unidad que respondés escribiendo (kana, kanji o
   romaji). Los cargás a mano, pegás varios desde una planilla o los generás desde un mazo.
 - **Pronunciación:** decí la palabra y fijate si se entendió. En la app instalada en
@@ -72,6 +77,11 @@ teclado, agregá el teclado japonés (*Ajustes → General → Teclado → Tecla
 
 Los trazos son de [KanjiVG](https://kanjivg.tagaini.net) © Ulrich Apel y
 colaboradores, licencia CC BY-SA 3.0 (`public/strokes/LICENSE.txt`).
+
+**Diccionario:** pestaña propia, japonés ⇄ español (e inglés), sin conexión. Buscás en
+kanji, kana, romaji o por significado; cada palabra se puede agregar a un mazo y cada
+kanji practicar o sumar a tus listas. Datos de JMdict y KANJIDIC2 © EDRDG, licencia
+CC BY-SA 4.0 (`public/dict/LICENSE.txt`).
 
 ## 4. Pasar las palabras de un dispositivo a otro
 

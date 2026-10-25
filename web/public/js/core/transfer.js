@@ -14,7 +14,7 @@
 // se validan ids, números y fechas, y se limpia cada texto.
 
 import { clean, stripHTML, isValidId, clampNumber, clampDate, MAX_NAME, fileSafeName } from './sanitize.js';
-import { KINDS, GENDERS, newDeck, newCard } from './model.js';
+import { KINDS, GENDERS, newDeck, newCard, uniqueKanji } from './model.js';
 import { INITIAL_EASE } from './sm2.js';
 
 export const LIMITS = Object.freeze({
@@ -26,6 +26,8 @@ export const LIMITS = Object.freeze({
   sessionsPerBackup: 20_000,
   quizzesPerBackup: 2_000,
   listeningsPerBackup: 2_000,
+  kanjiSetsPerBackup: 1_000,
+  kanjiPerSet: 3_000,
   listeningFileBytes: 90 * 1024 * 1024,
   mediaBytes: 60 * 1024 * 1024,
   transcriptChars: 20_000,
@@ -143,7 +145,8 @@ export function sanitizeBackup(raw) {
   const sessionsIn = list(raw.sessions);
   const quizzesIn = list(raw.quizzes);
   const listeningsIn = list(raw.listenings);
-  if (listeningsIn.length > LIMITS.listeningsPerBackup) throw errors.invalid();
+  const kanjiSetsIn = list(raw.kanjiSets);
+  if (listeningsIn.length > LIMITS.listeningsPerBackup || kanjiSetsIn.length > LIMITS.kanjiSetsPerBackup) throw errors.invalid();
   if (cardsIn.length > LIMITS.cardsPerBackup) throw errors.tooMany(LIMITS.cardsPerBackup);
   if (decksIn.length > LIMITS.decksPerBackup || sessionsIn.length > LIMITS.sessionsPerBackup || quizzesIn.length > LIMITS.quizzesPerBackup) {
     throw errors.invalid();
@@ -155,8 +158,16 @@ export function sanitizeBackup(raw) {
   const sessions = sessionsIn.map((s) => sanitizeRecord(s, now, sanitizeSessionRecord)).filter(Boolean);
   const quizzes = quizzesIn.map((q) => sanitizeRecord(q, now, sanitizeQuizRecord)).filter(Boolean);
   const listenings = listeningsIn.map((l) => sanitizeRecord(l, now, sanitizeListeningRecord)).filter(Boolean);
-  if (decks.length + cards.length + sessions.length + quizzes.length + listenings.length === 0) throw errors.empty();
-  return { decks, cards, sessions, quizzes, listenings };
+  const kanjiSets = kanjiSetsIn.map((k) => sanitizeRecord(k, now, sanitizeKanjiSetRecord)).filter(Boolean);
+  if (decks.length + cards.length + sessions.length + quizzes.length + listenings.length + kanjiSets.length === 0) throw errors.empty();
+  return { decks, cards, sessions, quizzes, listenings, kanjiSets };
+}
+
+function sanitizeKanjiSetRecord(k, updatedAt, now) {
+  const name = clean(k.name, MAX_NAME);
+  if (!name) return null;
+  const chars = [...uniqueKanji(typeof k.chars === 'string' ? k.chars : '')].slice(0, LIMITS.kanjiPerSet).join('');
+  return { id: k.id, name, chars, createdAt: clampDate(k.createdAt, now), updatedAt };
 }
 
 const LEVEL_IDS = ['easy', 'medium', 'hard'];
@@ -358,6 +369,7 @@ export function stateToBackup(state, now) {
     sessions: state.sessions,
     quizzes: state.quizzes ?? [],
     listenings: state.listenings ?? [],
+    kanjiSets: state.kanjiSets ?? [],
   };
 }
 

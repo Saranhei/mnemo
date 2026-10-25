@@ -17,6 +17,7 @@ web/
 │   ├── fonts/                  Tipografías propias (sin pedir nada a Google)
 │   ├── icons/                  Íconos de la app
 │   ├── strokes/                Trazos de kana y kanji (KanjiVG, CC BY-SA 3.0)
+│   ├── dict/                   Diccionario sin conexión (JMdict y KANJIDIC2, CC BY-SA 4.0)
 │   └── js/
 │       ├── app.js              Arranque, navegación, reloj, instalación
 │       ├── core/               Lógica pura, sin navegador (tiene pruebas)
@@ -27,19 +28,22 @@ web/
 │       │   ├── sanitize.js     Limpieza de texto y validaciones
 │       │   ├── japanese.js     Kana, romaji → kana y corrección tolerante de respuestas
 │       │   ├── strokes.js      Comparación de trazos dibujados con los de referencia
+│       │   ├── dictionary.js   Búsqueda en el diccionario (kanji, kana, romaji, significado)
+│       │   ├── listening.js    Espacios a completar y comparación del dictado
 │       │   └── practice.js     Palabras para practicar a partir de las tarjetas
 │       ├── data/
 │       │   ├── storage.js      IndexedDB (con respaldo en localStorage)
 │       │   └── store.js        Estado en memoria + todas las acciones que lo cambian
 │       ├── services/           Voz, sonido, pantalla encendida, archivos, Pomodoro
-│       ├── ui/                 Ayudantes de DOM, componentes, hojas y avisos
-│       └── views/              Pantallas: mazos, repaso, Pomodoro, sesiones, ajustes
-│           └── practice/       Práctica: escritura, preguntas, pronunciación y escucha
+│       ├── ui/                 DOM, componentes, hojas, avisos, pizarra de escritura, listas de kanji
+│       └── views/              Pantallas: mazos, repaso, diccionario, Pomodoro, sesiones, ajustes
+│           └── practice/       Práctica: escritura, kanji de memoria, preguntas, pronunciación, listening
 ├── src/sw.template.js          Service worker (modo sin conexión)
 ├── scripts/build.mjs           Arma dist/ y dist-preview/
 ├── scripts/serve.mjs           Servidor local con las cabeceras de producción
 ├── scripts/strokes-from-kanjivg.mjs  Regenera public/strokes/ desde KanjiVG
-└── tests/                      *.test.mjs (lógica), e2e.mjs y e2e-practice.mjs (navegador real)
+├── scripts/dict-from-jmdict.mjs      Regenera public/dict/ desde jmdict-simplified
+└── tests/                      *.test.mjs (lógica), e2e*.mjs (navegador real)
 ```
 
 ## Flujo de datos
@@ -91,7 +95,7 @@ web no pueden ejecutar código ni notificar con la pantalla apagada.
 
 ## Práctica
 
-Cinco ejercicios en la pestaña **Práctica** (Escritura, Preguntas, Pronunciación, Listening y ¿Qué escuchaste?). Los que usan audio o escritura a mano
+Seis ejercicios en la pestaña **Práctica** (Escritura, Kanji de memoria, Preguntas, Pronunciación, Listening y ¿Qué escuchaste?). Los que usan audio o escritura a mano
 corren en una capa a pantalla completa (`ui/layer.js`), fuera de la pantalla
 principal, así un cambio de datos (por ejemplo, que termine un Pomodoro) no los
 reinicia.
@@ -101,6 +105,13 @@ reinicia.
 - **Idiomas:** `WRITING_LANGUAGES` define, por idioma, sus conjuntos de caracteres y
   de dónde salen los trazos. Hoy solo japonés; para sumar otro se agrega una entrada
   con sus datos de trazos. El idioma elegido se recuerda (preferencia `writeLang`).
+- **Conjuntos:** kana, tus **listas de kanji** (`kanjiSets` en el modelo:
+  `{ id, name, chars }`, se sincronizan en la copia como todo) y los kanji de tus
+  mazos. Las listas se crean, editan y amplían desde Escritura (`ui/kanjiLists.js`) o
+  desde el Diccionario. Al pegar un texto quedan solo los kanji, sin repetir.
+- **Datos de cada kanji** (`services/kanjiDetails.js`): el significado sale de tu
+  tarjeta de kanji si la hay; si no, del diccionario (KANJIDIC2, en español cuando
+  existe). Lecturas on/kun y cantidad de trazos, del diccionario.
 - **Bien escrito:** los trazos quedan en verde con un tick chico cada uno; al
   terminar, tick grande y salto automático al siguiente a los 1,4 s (se cancela si
   el usuario navega o reintenta).
@@ -114,16 +125,43 @@ reinicia.
   que no se borra al actualizar la app).
 - **Animación:** cada trazo es un `<path>` SVG que se dibuja animando
   `stroke-dashoffset`, con el número de orden al lado.
-- **Corrección:** se dibuja con eventos de puntero (dedo, mouse o Apple Pencil; si
-  aparece el lápiz, se ignoran los toques de la palma). Al levantar el dedo, el
-  trazo se compara con el que corresponde según el orden (`core/strokes.js`):
-  ambos se re-muestrean a 32 puntos equidistantes y se mide la distancia promedio
-  entre puntos. Cuenta como bien si la distancia queda bajo un umbral que crece
-  con el largo del trazo y si el largo es parecido. Si coincide mejor al revés,
-  avisa que la dirección está invertida. Tras dos errores en el mismo trazo,
-  se anima ese trazo como pista.
+- **Pizarra** (`ui/writingBoard.js`): la comparten Escritura y Kanji de memoria. Se
+  dibuja con eventos de puntero (dedo, mouse o Apple Pencil; si aparece el lápiz, se
+  ignoran los toques de la palma).
+- **Corrección** (`core/strokes.js`), pensada para letra real (chica, corrida,
+  torcida, temblorosa) sin aceptar cualquier cosa:
+  1. **Ajuste a tu letra:** con los trazos que ya salieron bien se estima una escala
+     y un desplazamiento (mínimos cuadrados, con la escala tirada hacia 1 cuando hay
+     pocos datos). El trazo nuevo se compara después de deshacer ese ajuste, así un
+     kanji escrito chico en una esquina vale igual.
+  2. Se re-muestrea a 32 puntos y se suaviza el temblor.
+  3. Se mira por separado: **forma** (los dos trazos centrados), **dirección**
+     inicio→fin (hasta ~32°), **lugar** (centro del trazo; margen amplio en el primer
+     trazo) y **largo** (entre 0,38 y 2,6 veces el modelo). Los márgenes crecen con
+     el largo del trazo y se multiplican por `leniency` (1 en Escritura, 1,25 en
+     Kanji de memoria).
+  4. **Orden:** si lo dibujado coincide claramente mejor con un trazo que viene
+     después, no se acepta y se avisa "ese trazo va después".
+  5. Si coincide al revés, avisa que la dirección está invertida. Tras dos errores
+     en el mismo trazo, se anima ese trazo como pista.
+
+  Con letra simulada (escala, rotación, desplazamiento y temblor al azar) sobre 64
+  kanji de Genki, la versión anterior aceptaba el 19 % de los trazos de letra chica y
+  corrida; esta acepta el 99 %, y sigue rechazando ~93 % de los trazos hechos en
+  otro orden.
 - Guarda cuántas veces practicaste cada carácter (preferencia local) y lo marca
   en la grilla (punto amarillo: practicado; verde: alguna vez sin errores).
+
+### Kanji de memoria (`views/practice/kanjiRecall.js`)
+
+Se elige una fuente (lista propia o kanji de un mazo), cantidad y orden ("primero
+los que más me cuestan" usa las estadísticas `recallStats` guardadas en el
+dispositivo). Se muestra el significado y las lecturas, y hay que escribir el kanji
+en blanco, sin guía. **Pista** anima el trazo que toca; **No me acuerdo** muestra el
+kanji completo para copiarlo. Nota por kanji: ◎ perfecto, ○ con errores, △ con ayuda
+(sello sobre la pizarra) y salto automático. Al final: precisión (trazos /
+(trazos + errores + pistas)), lista con la nota de cada uno y "Repetir los que
+costaron".
 
 ### Preguntas (`views/practice/quizzes.js`)
 
@@ -180,6 +218,28 @@ Ejercicios de textos largos (`listenings` en el modelo):
   y qué caracteres faltaron.
 - **Ejemplos** (`listeningExamples.js`): tres textos originales para probar.
 
+## Diccionario (`views/dictionary.js`)
+
+- **Datos:** [JMdict y KANJIDIC2](https://www.edrdg.org) (© EDRDG, CC BY-SA 4.0) en el
+  formato de [jmdict-simplified](https://github.com/scriptin/jmdict-simplified).
+  `scripts/dict-from-jmdict.mjs` junta las palabras comunes (glosas en inglés) con
+  todas las que tienen traducción al español: ~41.000 palabras (`dict/words.json`,
+  5,3 MB; 1,7 MB comprimido) y ~3.100 kanji de uso habitual (`dict/kanji.json`).
+  Por qué no una API: Takoboto no tiene API pública (usa estos mismos datos dentro
+  de la app) y la API de Jisho no es oficial ni permite llamadas desde otra web.
+  Así además funciona sin conexión y no se manda lo que buscás a ningún servidor.
+- **Carga:** los archivos se piden al abrir el Diccionario (o al practicar un kanji)
+  y el service worker los guarda en `mnemo-dict-v1` (se usa lo guardado y se
+  actualiza en segundo plano).
+- **Búsqueda** (`core/dictionary.js`): kanji y kana (exacto, prefijo, contiene),
+  romaji pasado a kana, y significado en español o inglés (glosa exacta, palabra
+  inicial o palabra dentro). Orden: calidad de la coincidencia, palabras comunes,
+  posición de la glosa en la entrada y frecuencia de sus kanji. ~20 ms por búsqueda.
+- **Acciones:** escuchar, agregar la palabra como tarjeta a un mazo, ver cada kanji
+  (significado, lecturas, trazos, nivel JLPT aproximado, palabras de ejemplo),
+  practicarlo en Escritura, sumarlo a una lista, y abrir la búsqueda en Takoboto o
+  Jisho (enlaces externos con `noopener noreferrer`; no se les manda nada más).
+
 ## Modo sin conexión
 
 `scripts/build.mjs` calcula un número de versión a partir del contenido de los
@@ -212,7 +272,9 @@ app se recarga una vez (después de guardar los datos).
 |---|---|
 | `tests/core.test.mjs` | SM-2, Pomodoro, sanitización, consultas, combinación de copias, importación (Anki, nativa, archivos maliciosos) |
 | `tests/listening.test.mjs` | Espacios con corchetes y automáticos por nivel, frases, comparación del dictado, importar/exportar ejercicios (tipos y tamaños) |
-| `tests/practice.test.mjs` | Romaji → kana, corrección tolerante, comparación de trazos (bien, lejos, al revés, puntos), palabras desde tarjetas, cuestionarios en la copia |
+| `tests/kanji.test.mjs` | Listas de kanji (limpieza, copia), búsqueda en el diccionario (kanji, kana, romaji, significado, desempates) y los datos reales generados |
+| `tests/e2e-kanji.mjs` | En Chromium: crear y ampliar una lista, escribir 日 chico/corrido/torcido, Kanji de memoria (perfecto y con "No me acuerdo"), diccionario (significado, romaji, kanji, tarjeta, sumar a lista), celular sin desbordes |
+| `tests/practice.test.mjs` | Romaji → kana, corrección tolerante, comparación de trazos (bien, lejos, al revés, puntos, letra chica y corrida, torcido), palabras desde tarjetas, cuestionarios en la copia |
 | `tests/e2e-practice.mjs` | En Chromium (iPad horizontal y celular): trazos simulados de あ (tick y salto automático), い (mal) y 曜, generar y responder preguntas, "¿qué escuchaste?", pronunciación con dictado del teclado, listening (completar, preguntas y dictado completo) |
 | `tests/e2e.mjs` | En Chromium a tamaño iPhone (claro) e iPad (oscuro): alta de tarjeta, XSS, repaso con deshacer, Pomodoro y anotación, sesiones, exportar/importar, datos tras recargar, modo sin conexión, sin desbordes horizontales ni errores de consola |
 

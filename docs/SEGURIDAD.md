@@ -56,6 +56,8 @@ Todo archivo importado se trata como potencialmente malicioso (`DeckTransfer`):
 | Versión de formato desconocida | Se rechaza con un mensaje claro |
 | Nombre de archivo con rutas (`../`) al exportar | Se filtran a letras, números, `-`, `_` y espacios |
 | (Web) Audio/video de un ejercicio de listening | Solo tipos `audio/*` y `video/*`, hasta 60 MB de audio y 90 MB de archivo; se guarda como `Blob` local y se reproduce con un `blob:` URL propio (CSP `media-src 'self' blob:`). Nunca se sube a ningún servidor |
+| (Web) Listas de kanji importadas | Solo se guardan caracteres kanji (sin repetir, máximo 3.000 por lista y 1.000 listas por copia); el nombre se limpia como cualquier texto |
+| (Web) Búsquedas del diccionario | Se resuelven en el dispositivo con datos propios: lo que buscás no sale a ningún servidor. Los enlaces a Takoboto/Jisho solo se abren si los tocás, con `noopener noreferrer` |
 | Acceso a archivos fuera del sandbox | Solo archivos que el usuario elige, con `startAccessingSecurityScopedResource` |
 
 ## Plataforma

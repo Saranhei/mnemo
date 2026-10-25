@@ -30,10 +30,10 @@ export function newId() {
 }
 
 /** Colecciones que se guardan y se sincronizan. */
-export const COLLECTIONS = Object.freeze(['decks', 'cards', 'sessions', 'quizzes', 'listenings']);
+export const COLLECTIONS = Object.freeze(['decks', 'cards', 'sessions', 'quizzes', 'listenings', 'kanjiSets']);
 
 export function emptyState() {
-  return { decks: [], cards: [], sessions: [], quizzes: [], listenings: [] };
+  return { decks: [], cards: [], sessions: [], quizzes: [], listenings: [], kanjiSets: [] };
 }
 
 /** Completa colecciones que falten (datos guardados por versiones anteriores). */
@@ -80,6 +80,19 @@ export function newSession(now) {
  */
 export function newQuiz({ name, questions = [] }, now) {
   return { id: newId(), name, questions, createdAt: now, updatedAt: now };
+}
+
+/**
+ * Lista de kanji propia ("Mis kanji", "Genki L3"...): los que vas aprendiendo, para
+ * practicar escritura y memoria. `chars` es un texto con los kanji, sin repetir.
+ */
+export function newKanjiSet({ name, chars = '' }, now) {
+  return { id: newId(), name, chars: uniqueKanji(chars), createdAt: now, updatedAt: now };
+}
+
+/** Deja solo los kanji de un texto, una vez cada uno y en el orden en que aparecen. */
+export function uniqueKanji(text) {
+  return [...new Set([...String(text ?? '')].filter((ch) => /[㐀-䶿一-鿿豈-﫿々]/.test(ch)))].join('');
 }
 
 /**
@@ -228,5 +241,5 @@ export function exampleState(now) {
   const cards = rows.map(([front, back, pronunciation, example, kind], i) =>
     newCard({ deckId: deck.id, front, back, pronunciation, example, kind }, now + i),
   );
-  return { decks: [deck], cards, sessions: [], quizzes: [], listenings: [] };
+  return { decks: [deck], cards, sessions: [], quizzes: [], listenings: [], kanjiSets: [] };
 }

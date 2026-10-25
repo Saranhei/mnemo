@@ -137,3 +137,34 @@ test('Cuestionarios: viajan en la copia y se limpian', () => {
   assert.equal(mergeStates(emptyState(), r.state).added, 1);
   assert.equal(sanitizeQuestions([{ prompt: 'x', answers: ['a'.repeat(500)] }])[0].answers[0].length, 200);
 });
+
+// ─────────────────────────── Trazos: letra propia ───────────────────────────
+
+import { estimateTransform } from '../public/js/core/strokes.js';
+
+/** Pasa un trazo del modelo a "tu letra": más chico, corrido y con temblor. */
+const myHand = (pts, { scale = 0.6, dx = 25, dy = 8, wobble = 2.5 } = {}) =>
+  jitter(pts.map((p) => ({ x: p.x * scale + dx, y: p.y * scale + dy })), wobble);
+
+test('Trazos: un kanji chico y corrido (十) vale gracias al ajuste a tu letra', () => {
+  const h1 = line(15, 50, 95, 50);
+  const v1 = line(55, 15, 55, 95);
+  const userH = myHand(h1);
+  const first = compareStroke(userH, h1);
+  assert.ok(first.ok, 'el primer trazo tiene margen amplio de lugar');
+  const t = estimateTransform([{ user: userH, ref: h1 }]);
+  const userV = myHand(v1);
+  assert.ok(compareStroke(userV, v1, { transform: t }).ok, 'el segundo se compara en tu escala');
+  const t2 = estimateTransform([{ user: userH, ref: h1 }, { user: userV, ref: v1 }]);
+  assert.ok(Math.abs(t2.scale - 0.6) < 0.08, `escala estimada ${t2.scale}`);
+});
+
+test('Trazos: torcido vale; otra dirección o en otro lugar del carácter, no', () => {
+  const ref = line(20, 30, 90, 30);
+  assert.ok(compareStroke(line(22, 26, 86, 38), ref).ok, 'inclinado unos 10°');
+  const bow = Array.from({ length: 20 }, (_, i) => ({ x: 20 + i * 3.6, y: 30 + Math.sin((i / 19) * Math.PI) * 6 }));
+  assert.ok(compareStroke(bow, ref).ok, 'un poco curvado');
+  assert.equal(compareStroke(line(20, 30, 85, 85), ref).ok, false, 'en diagonal no');
+  const t = { scale: 1, dx: 0, dy: 0 };
+  assert.equal(compareStroke(line(20, 70, 90, 70), ref, { transform: t }).ok, false, 'con letra conocida, abajo en vez de arriba no');
+});

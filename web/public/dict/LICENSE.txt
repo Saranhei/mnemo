@@ -1,0 +1,11 @@
+Diccionario de Mnemo
+
+Datos de JMdict y KANJIDIC2 (versión 2026-10-19), © Electronic Dictionary
+Research and Development Group (EDRDG), usados bajo la licencia Creative Commons
+Attribution-ShareAlike 4.0 (https://creativecommons.org/licenses/by-sa/4.0/).
+https://www.edrdg.org/edrdg/licence.html
+
+Convertidos a JSON por jmdict-simplified (https://github.com/scriptin/jmdict-simplified)
+y compactados por scripts/dict-from-jmdict.mjs (se quitaron campos y se combinaron
+las glosas en inglés y en español). Este archivo derivado se distribuye bajo la
+misma licencia CC BY-SA 4.0.
