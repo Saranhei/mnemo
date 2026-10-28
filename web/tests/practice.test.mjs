@@ -168,3 +168,34 @@ test('Trazos: torcido vale; otra dirección o en otro lugar del carácter, no', 
   const t = { scale: 1, dx: 0, dy: 0 };
   assert.equal(compareStroke(line(20, 70, 90, 70), ref, { transform: t }).ok, false, 'con letra conocida, abajo en vez de arriba no');
 });
+
+import { startsLike } from '../public/js/core/strokes.js';
+
+test('Trazos: un trazo de un tirón dibujado en dos partes se reconoce como comienzo', () => {
+  // Esquina de 口: horizontal y después vertical, un solo trazo.
+  const corner = [...line(30, 30, 80, 30, 10), ...line(80, 30, 80, 80, 10).slice(1)];
+  assert.ok(startsLike(line(31, 31, 79, 30), corner), 'la parte horizontal es el comienzo');
+  assert.ok(!startsLike(line(80, 30, 80, 80), corner), 'la parte vertical sola no es el comienzo');
+  const both = [...line(31, 31, 79, 30), ...line(80, 31, 79, 79)];
+  assert.ok(compareStroke(both, corner).ok, 'las dos partes juntas valen');
+});
+
+// ─────────────────────────── Pronunciación ───────────────────────────
+
+import { judgeSpoken, soundKey } from '../public/js/core/speech.js';
+
+test('Pronunciación: acepta homófonos, vocales largas y avisa "casi"', () => {
+  const hon = ['ほん', '本'];
+  const readings = (t) => ({ 翻: ['ほん'], 保: ['ほ'] })[t] ?? [];
+  assert.equal(soundKey('とうきょう'), soundKey('とーきょー'));
+  assert.equal(soundKey('本'), '', 'con kanji no hay clave de sonido');
+  assert.deepEqual(judgeSpoken(['本'], hon).ok, true);
+  assert.equal(judgeSpoken(['ホン'], hon).ok, true, 'katakana');
+  const homophone = judgeSpoken(['翻'], hon, { readingsOf: readings });
+  assert.ok(homophone.ok && !homophone.near && homophone.reading === 'ほん', 'otro kanji que se lee igual');
+  const soft = judgeSpoken(['保'], hon, { readingsOf: readings });
+  assert.ok(soft.ok && soft.near, 'la ん casi no se escuchó: "casi"');
+  assert.equal(judgeSpoken(['猫'], hon, { readingsOf: readings }).ok, false);
+  assert.equal(judgeSpoken(['か'], ['き']).ok, false, 'palabras de un sonido: sin "casi"');
+  assert.ok(judgeSpoken(['いいえ', 'ほん'], hon).ok, 'mira todas las alternativas');
+});

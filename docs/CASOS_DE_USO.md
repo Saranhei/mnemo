@@ -168,7 +168,7 @@ En **Ajustes ▸ Sincronización** se ve si hay una cuenta de iCloud activa.
 4. Dibujar los trazos en orden con el dedo o el Apple Pencil. Vale aunque la letra salga más chica, corrida o un poco torcida: la app se adapta a tu tamaño de letra después del primer trazo. Cada trazo correcto queda en color; uno incorrecto se marca en rojo y se explica por qué (posición u orden, o dirección invertida). Después de dos errores en el mismo trazo, se muestra cuál era.
 5. Al terminar bien, el carácter queda dibujado en verde, aparece un tick grande y la app pasa sola al siguiente (1,4 s). Si hubo que repetir, "Repetilo" y queda en el mismo para reintentar. **Siguiente**, **Anterior** o **Reintentar** cancelan el salto automático.
 
-Opciones: **Guía** (mostrar u ocultar el carácter de fondo), **Ver trazos**, **Escuchar**, **Reintentar**. Teclado: espacio = animación, ← → = anterior/siguiente.
+Opciones: **Guía** (mostrar u ocultar el carácter de fondo), **Ver trazos**, **Escuchar**, **Reintentar**, **Pasar solo al siguiente** (apagalo para quedarte mirando cómo quedó) y **Mostrar los trazos al abrir** (apagalo para que no te muestre el carácter antes de intentarlo). Si levantás el dedo a mitad de un trazo que va de un tirón, la app espera la otra parte y te avisa. Teclado: espacio = animación, ← → = anterior/siguiente.
 **Sin conexión:** los kana siempre; un kanji, si ya se practicó alguna vez con internet.
 
 ## CU-13 · Crear un cuestionario
@@ -191,6 +191,8 @@ Opciones: **Guía** (mostrar u ocultar el carácter de fondo), **Ver trazos**, *
 3. Según dónde se use:
    - **Safari / Chrome:** **Decirlo** → se escucha al usuario y se indica si se entendió la palabra y qué se escuchó.
    - **App instalada en iPhone/iPad** (Apple no permite el reconocimiento ahí): tocar el campo y usar el micrófono del teclado japonés; o **Grabarme**, escuchar la grabación junto al modelo y marcar **Me salió bien** o **Repetir**.
+
+Se acepta si el reconocimiento escribió otro kanji que se lee igual (翻 por 本) o con vocales más largas o cortas; si falla un solo sonido (ほ por ほん) dice **¡Casi!** y qué sonido marcar más.
 
 **Privacidad:** el reconocimiento automático lo hace el navegador (Apple o Google) y puede enviar el audio a sus servidores; "Grabarme" no envía nada.
 

@@ -4,7 +4,7 @@
 //
 // Coordenadas internas: cuadrícula de KanjiVG (109 × 109).
 
-import { compareStroke, estimateTransform, GRID } from '../core/strokes.js';
+import { compareStroke, estimateTransform, startsLike, GRID } from '../core/strokes.js';
 import { samplePath } from '../services/strokeData.js';
 
 const SVG_NS = 'http://www.w3.org/2000/svg';
@@ -45,6 +45,7 @@ export function createBoard(host, strokes, { guide = false, leniency = 1, onProg
   let mistakes = 0;
   let hints = 0;
   let missesOnStroke = 0;
+  let pending = null; // primera parte de un trazo que va de un tirón: { points, line }
   let penSeen = false;
   let drawing = null;
   let animToken = 0;
@@ -146,14 +147,41 @@ export function createBoard(host, strokes, { guide = false, leniency = 1, onProg
 
   function onUp(e) {
     if (!drawing || e.pointerId !== drawing.id) return;
-    const { points, line } = drawing;
+    const { line } = drawing;
+    let { points } = drawing;
     drawing = null;
     if (points.length < 2) points.push({ ...points[0] });
-    const result = compareStroke(points, refs[current], {
-      transform: accepted.length ? estimateTransform(accepted) : null,
-      later: refs.slice(current + 1),
-      leniency,
-    });
+    const transform = accepted.length ? estimateTransform(accepted) : null;
+    // ¿Es la segunda parte de un trazo que levantaste a la mitad? Se juntan las dos.
+    let joined = false;
+    if (pending) {
+      const both = [...pending.points, ...points];
+      if (compareStroke(both, refs[current], { transform, leniency }).ok) {
+        pending.line.remove();
+        line.setAttribute('points', both.map((p) => `${p.x.toFixed(1)},${p.y.toFixed(1)}`).join(' '));
+        points = both;
+        joined = true;
+      } else {
+        pending.line.remove();
+      }
+      pending = null;
+    }
+    let result = compareStroke(points, refs[current], { transform, later: refs.slice(current + 1), leniency });
+    if (!result.ok && !joined && startsLike(points, refs[current], { transform, leniency })) {
+      // Va bien, pero falta el resto: no es error todavía.
+      pending = { points, line };
+      line.classList.add('is-pending');
+      onMessage?.(`Trazo ${current + 1}: seguí sin levantar el dedo, este trazo va de un solo tirón.`);
+      return;
+    }
+    // Para no quedar trabado en un trazo: después de dos intentos fallidos se compara
+    // también sin el ajuste a tu letra (por si se desacomodó con un trazo anterior) y
+    // con más margen. El error ya quedó contado.
+    if (!result.ok && missesOnStroke >= 2) {
+      const relaxed = compareStroke(points, refs[current], { transform: null, leniency: leniency * 1.4 });
+      const relaxedAligned = accepted.length ? compareStroke(points, refs[current], { transform: estimateTransform(accepted), leniency: leniency * 1.4 }) : relaxed;
+      if (relaxed.ok || relaxedAligned.ok) result = { ...result, ok: true };
+    }
     if (result.ok) {
       accepted.push({ user: points, ref: refs[current] });
       // Tu trazo queda, en verde, con un tick chico al final.
@@ -166,6 +194,7 @@ export function createBoard(host, strokes, { guide = false, leniency = 1, onProg
       current += 1;
       missesOnStroke = 0;
       progress();
+      if (joined) onMessage?.('¡Bien! La próxima, ese trazo hacelo de un solo tirón.');
       if (current === strokes.length) complete();
       return;
     }
@@ -211,6 +240,7 @@ export function createBoard(host, strokes, { guide = false, leniency = 1, onProg
       markLayer.replaceChildren();
       current = 0;
       accepted = [];
+      pending = null;
       mistakes = 0;
       hints = 0;
       missesOnStroke = 0;

@@ -8,7 +8,8 @@ import { openLayer, resultPanel, feedback } from '../../ui/layer.js';
 import * as store from '../../data/store.js';
 import { readPref, writePref } from '../../data/storage.js';
 import { liveDecks, deckCards } from '../../core/model.js';
-import { matchesAnswer } from '../../core/japanese.js';
+import { judgeSpoken, soundKey } from '../../core/speech.js';
+import { preloadReadings, readingsOf } from '../../services/dictionary.js';
 import { itemsFromCards, speechText, acceptedForms, pickDistractors, shuffle, readingHint } from '../../core/practice.js';
 import {
   sayJapanese, voicesReady, japaneseVoice, canRecognize, listenOnce, recognitionErrorMessage, canRecord, startRecording, isInstalledApp,
@@ -132,7 +133,19 @@ const nextButton = (onClick, label = 'Siguiente') =>
 
 // ───────────────────────────── Pronunciación ─────────────────────────────
 
+/** Nota de pronunciación para mostrar: bien, casi (con qué marcar más) o no. */
+function spokenFeedback(judged, item, source) {
+  const heard = judged.heard ? `${source}: ${judged.heard}${judged.reading ? ` (se lee ${judged.reading})` : ''}` : '';
+  if (!judged.ok) return { ok: false, title: 'No se entendió igual', lines: [heard || `${source}: —`] };
+  if (!judged.near) return { ok: true, title: '¡Se entendió bien!', lines: [heard] };
+  const target = acceptedForms(item).map(soundKey).find(Boolean) ?? '';
+  const heardKey = soundKey(judged.reading || judged.heard);
+  const tip = target.endsWith('N') && !heardKey.endsWith('N') ? 'Marcá un poco más la ん del final.' : 'Marcá un poco más cada sonido.';
+  return { ok: true, title: '¡Casi! Se entendió muy parecido', lines: [heard, tip] };
+}
+
 function runSpeak(ctx, deck, items) {
+  preloadReadings();
   scoreRunner(ctx, {
     title: `Pronunciación · ${deck.name}`,
     items,
@@ -149,7 +162,6 @@ function runSpeak(ctx, deck, items) {
         document.getElementById('audio-next')?.focus({ preventScroll: true });
       };
 
-      const check = (heard) => matchesAnswer(heard, acceptedForms(item));
 
       // 1) Reconocimiento de voz del navegador (Safari, Chrome)
       const micBtn = h('button', { class: 'btn btn--mic', type: 'button' }, icon('mic', { size: 22 }), 'Decirlo');
@@ -166,8 +178,8 @@ function runSpeak(ctx, deck, items) {
           result.appendChild(h('p', { class: 'field__error' }, recognitionErrorMessage(r.error)));
           return;
         }
-        const hit = r.alternatives.find(check);
-        grade(Boolean(hit), hit ? '¡Se entendió bien!' : 'No se entendió igual', [`Escuché: ${hit ?? r.alternatives[0] ?? '—'}`]);
+        const f = spokenFeedback(judgeSpoken(r.alternatives, acceptedForms(item), { readingsOf }), item, 'Escuché');
+        grade(f.ok, f.title, f.lines);
       });
 
       // 2) Dictado con el micrófono del teclado (sirve también en la app instalada)
@@ -180,8 +192,8 @@ function runSpeak(ctx, deck, items) {
           onSubmit: (e) => {
             e.preventDefault();
             if (!typed.value.trim()) return typed.focus();
-            const ok = check(typed.value);
-            grade(ok, ok ? '¡Se entendió bien!' : 'No se entendió igual', [`El dictado escribió: ${typed.value}`]);
+            const f = spokenFeedback(judgeSpoken([typed.value], acceptedForms(item), { readingsOf }), item, 'El dictado escribió');
+            grade(f.ok, f.title, f.lines);
           },
         },
         h('label', { class: 'field__label', for: 'speak-typed' }, 'Con el dictado del teclado'),

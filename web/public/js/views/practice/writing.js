@@ -3,7 +3,7 @@
 // de tus mazos.
 
 import { h, icon, plural } from '../../ui/dom.js';
-import { screenHeader } from '../../ui/components.js';
+import { screenHeader, toggle } from '../../ui/components.js';
 import { openLayer, resultPanel } from '../../ui/layer.js';
 import { createBoard } from '../../ui/writingBoard.js';
 import { kanjiLists, kanjiSources, openNewListSheet, openAddKanjiSheet, openEditListSheet } from '../../ui/kanjiLists.js';
@@ -170,6 +170,10 @@ export function writingView(ctx) {
 export function openWriting(ctx, chars, start = 0) {
   let index = start;
   let guide = readPref('writeGuide', true);
+  // Preferencias (pedidas por quienes la usan): no pasar solo al siguiente, para mirar
+  // cómo quedó el trazo; y no animar el carácter al abrirlo, para no "spoilearlo".
+  let autoNext = readPref('writeAutoNext', true);
+  let autoAnimate = readPref('writeAutoAnimate', true);
   let results = { done: 0, perfect: 0 };
   let board = null;
   let advanceTimer = null;
@@ -246,6 +250,12 @@ export function openWriting(ctx, chars, start = 0) {
       ),
       h(
         'div',
+        { class: 'write__prefs' },
+        toggle({ id: 'write-auto-next', label: 'Pasar solo al siguiente', checked: autoNext, onChange: (v) => ((autoNext = v), writePref('writeAutoNext', v), v || cancelAdvance()) }),
+        toggle({ id: 'write-auto-anim', label: 'Mostrar los trazos al abrir', checked: autoAnimate, onChange: (v) => ((autoAnimate = v), writePref('writeAutoAnimate', v)) }),
+      ),
+      h(
+        'div',
         { class: 'write__nav' },
         h('button', { class: 'btn btn--ghost', type: 'button', disabled: index === 0, onClick: () => go(-1) }, icon('back', { size: 18 }), 'Anterior'),
         h('button', { class: 'btn btn--primary', type: 'button', id: 'write-next', onClick: () => go(1) }, index === chars.length - 1 ? 'Terminar' : 'Siguiente', icon('next', { size: 18 })),
@@ -286,12 +296,14 @@ export function openWriting(ctx, chars, start = 0) {
         status.textContent = mistakes === 0 ? '¡Perfecto! Sin errores.' : `¡Bien! Con ${plural(mistakes, 'error', 'errores')}.`;
         status.className = `write__status write__status--${mistakes === 0 ? 'ok' : 'warn'}`;
         // Pasa solo al siguiente después de mostrar el tick (se cancela si tocás algo).
+        if (!autoNext) return;
         advanceTimer = setTimeout(() => {
-          if (chars[index] === ch && layer.body.isConnected) go(1);
+          if (autoNext && chars[index] === ch && layer.body.isConnected) go(1);
         }, 1400);
       },
     });
-    board.animate();
+    if (autoAnimate) board.animate();
+    else status.textContent = `${strokes.length} trazos. Tocá "Ver trazos" si necesitás ayuda.`;
   }
 
   show();

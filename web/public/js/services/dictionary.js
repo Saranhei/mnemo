@@ -63,3 +63,38 @@ export function kanjiMeanings(info) {
   if (!info) return { lang: 'es', list: [] };
   return info.es?.length ? { lang: 'es', list: info.es } : { lang: 'en', list: info.en ?? [] };
 }
+
+// ───────────────────── Lecturas (para corregir la pronunciación) ─────────────────────
+
+let readingMap = null;
+let kanjiCache = null;
+
+/** Carga en segundo plano lo necesario para `readingsOf` (no hace falta esperar). */
+export function preloadReadings() {
+  loadWordIndex()
+    .then((index) => {
+      if (readingMap) return;
+      readingMap = new Map();
+      for (const entry of index) {
+        for (const form of entry.kanji) {
+          const list = readingMap.get(form) ?? [];
+          list.push(...entry.w.r);
+          readingMap.set(form, list);
+        }
+      }
+    })
+    .catch(() => {});
+  loadKanjiData()
+    .then((d) => (kanjiCache = d))
+    .catch(() => {});
+}
+
+const toHira = (s) => s.replace(/[ァ-ヶ]/g, (c) => String.fromCharCode(c.charCodeAt(0) - 0x60));
+
+/** Cómo se lee un texto con kanji según el diccionario (vacío si no se sabe o no cargó). */
+export function readingsOf(text) {
+  const out = [...(readingMap?.get(text) ?? [])];
+  const info = [...text].length === 1 ? kanjiCache?.[text] : null;
+  if (info) out.push(...info.on.map(toHira), ...info.kun.map((r) => r.replace(/[-.]/g, '')));
+  return [...new Set(out)];
+}

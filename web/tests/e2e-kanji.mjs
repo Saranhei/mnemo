@@ -33,7 +33,7 @@ const shot = async (page, name) => {
  * Dibuja el carácter "a mano": más chico, corrido, un poco girado y con temblor
  * (como escribe una persona, no como el modelo).
  */
-async function drawByHand(page, ch, { scale = 0.62, dx = 14, dy = -8, rot = 0.07, wobble = 1.2 } = {}) {
+async function drawByHand(page, ch, { scale = 0.62, dx = 14, dy = -8, rot = 0.07, wobble = 1.2, split = -1 } = {}) {
   const strokes = await page.evaluate(
     async ({ c, scale, dx, dy, rot, wobble }) => {
       const block = (c.codePointAt(0) >> 8).toString(16).padStart(3, '0');
@@ -62,7 +62,9 @@ async function drawByHand(page, ch, { scale = 0.62, dx = 14, dy = -8, rot = 0.07
     },
     { c: ch, scale, dx, dy, rot, wobble },
   );
-  for (const pts of strokes) {
+  // split: ese trazo se dibuja en dos partes, levantando el dedo en la esquina.
+  const list = strokes.flatMap((pts, i) => (i === split ? [pts.slice(0, 11), pts.slice(10)] : [pts]));
+  for (const pts of list) {
     await page.mouse.move(pts[0][0], pts[0][1]);
     await page.mouse.down();
     for (const [x, y] of pts.slice(1)) await page.mouse.move(x, y, { steps: 2 });
@@ -114,10 +116,39 @@ console.log('iPad (1180×820)');
   await page.locator('.char-cell', { hasText: '日' }).click();
   await page.waitForSelector('.board');
   await page.waitForTimeout(400);
+  await page.locator('label[for="write-auto-next"]').click(); // no pasar solo al siguiente
+  assert.equal(await page.isChecked('#write-auto-next'), false);
   await drawByHand(page, '日');
   await page.waitForSelector('.write__status--ok, .write__status--warn');
+  await page.waitForTimeout(2000);
+  assert.equal((await page.locator('.write__char').textContent()).trim(), '日', 'se queda para mirar el trazo');
   await shot(page, 'k02-ipad-escritura-a-mano');
+
+  step('escritura: sin animación al abrir (para no spoilear)');
+  await page.locator('label[for="write-auto-anim"]').click();
+  await page.locator('#write-next').click();
+  await page.waitForSelector('.board');
+  await page.waitForTimeout(700);
+  assert.equal(await page.locator('.board__anim-stroke').count(), 0, 'no se anima solo');
   await page.keyboard.press('Escape');
+
+  if (LISTS) {
+    step('escritura: un trazo de un tirón hecho en dos partes (口)');
+    await page.locator('.set-chip', { hasText: 'L06 · Kanji' }).click();
+    await page.locator('.char-cell', { hasText: '口' }).click();
+    await page.waitForSelector('.board');
+    await page.waitForTimeout(300);
+    await drawByHand(page, '口', { split: 1 });
+    await page.waitForSelector('.write__status--ok');
+    await shot(page, 'k02b-ipad-dos-partes');
+    await page.keyboard.press('Escape');
+    // Volver a dejar las preferencias como venían.
+    await page.locator('.char-cell').first().click();
+    await page.waitForSelector('.board');
+    await page.locator('label[for="write-auto-next"]').click();
+    await page.locator('label[for="write-auto-anim"]').click();
+    await page.keyboard.press('Escape');
+  }
 
   step('kanji de memoria');
   await page.getByRole('button', { name: 'Práctica', exact: true }).first().click();

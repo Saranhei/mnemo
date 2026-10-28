@@ -115,6 +115,11 @@ reinicia.
 - **Bien escrito:** los trazos quedan en verde con un tick chico cada uno; al
   terminar, tick grande y salto automático al siguiente a los 1,4 s (se cancela si
   el usuario navega o reintenta).
+- **Opciones** (en el panel, se recuerdan): "Pasar solo al siguiente"
+  (`writeAutoNext`; apagado, te quedás mirando cómo quedó) y "Mostrar los trazos al
+  abrir" (`writeAutoAnimate`; apagado, no se anima solo y no te "spoilea" el
+  carácter). Kanji de memoria tiene su propio "Pasar solo al siguiente"
+  (`recallAutoNext`).
 
 - **Datos:** los trazos vienen de [KanjiVG](https://kanjivg.tagaini.net) (orden de
   trazos japonés). `scripts/strokes-from-kanjivg.mjs` los guarda en
@@ -144,6 +149,11 @@ reinicia.
      después, no se acepta y se avisa "ese trazo va después".
   5. Si coincide al revés, avisa que la dirección está invertida. Tras dos errores
      en el mismo trazo, se anima ese trazo como pista.
+  6. **Trazo en dos partes** (`startsLike`): si levantás el dedo a mitad de un trazo
+     que va de un tirón (la esquina de 口, 日, 月) y lo dibujado coincide con el
+     comienzo, no es error: queda punteado, se espera la otra parte y se juntan.
+  7. **Para no quedar trabado:** desde el tercer intento en el mismo trazo se compara
+     también sin el ajuste a tu letra y con 1,4× de margen (el error ya se contó).
 
   Con letra simulada (escala, rotación, desplazamiento y temblor al azar) sobre 64
   kanji de Genki, la versión anterior aceptaba el 19 % de los trazos de letra chica y
@@ -188,8 +198,16 @@ Tres formas, porque no todas funcionan en todos lados:
 3. **Grabarme y comparar:** graba con el micrófono, reproduce la grabación junto al
    modelo y uno mismo marca si salió bien. El audio no sale del dispositivo.
 
-Lo reconocido se compara con la lectura en kana, el kanji y lo escrito en la
-tarjeta (también `1時` = `一時`).
+Lo reconocido se corrige con `core/speech.js` (`judgeSpoken`), probando las 5
+alternativas que da el reconocimiento:
+
+1. igual que una respuesta escrita (kana, kanji o romaji de la tarjeta; `1時` = `一時`);
+2. **homófonos:** si escribió otro kanji que se lee igual (翻 en vez de 本), se busca
+   su lectura en el diccionario (`readingsOf`) y vale;
+3. **vocales largas o cortas** mezcladas (ほーん = ほん, とーきょー = とうきょう);
+4. **"casi":** un solo sonido distinto en palabras de 2 sílabas o más (ほ en vez de
+   ほん, porque la ん final casi no se escuchó). Cuenta como bien y te dice qué marcar
+   (por ejemplo, "Marcá un poco más la ん del final").
 
 ### ¿Qué escuchaste? (`views/practice/audio.js`)
 
@@ -273,8 +291,8 @@ app se recarga una vez (después de guardar los datos).
 | `tests/core.test.mjs` | SM-2, Pomodoro, sanitización, consultas, combinación de copias, importación (Anki, nativa, archivos maliciosos) |
 | `tests/listening.test.mjs` | Espacios con corchetes y automáticos por nivel, frases, comparación del dictado, importar/exportar ejercicios (tipos y tamaños) |
 | `tests/kanji.test.mjs` | Listas de kanji (limpieza, copia), búsqueda en el diccionario (kanji, kana, romaji, significado, desempates) y los datos reales generados |
-| `tests/e2e-kanji.mjs` | En Chromium: crear y ampliar una lista, escribir 日 chico/corrido/torcido, Kanji de memoria (perfecto y con "No me acuerdo"), diccionario (significado, romaji, kanji, tarjeta, sumar a lista), celular sin desbordes |
-| `tests/practice.test.mjs` | Romaji → kana, corrección tolerante, comparación de trazos (bien, lejos, al revés, puntos, letra chica y corrida, torcido), palabras desde tarjetas, cuestionarios en la copia |
+| `tests/e2e-kanji.mjs` | En Chromium: crear y ampliar una lista, escribir 日 chico/corrido/torcido, opciones de no avanzar y no animar, 口 con un trazo en dos partes, Kanji de memoria (perfecto y con "No me acuerdo"), diccionario (significado, romaji, kanji, tarjeta, sumar a lista), celular sin desbordes |
+| `tests/practice.test.mjs` | Romaji → kana, corrección tolerante, comparación de trazos (bien, lejos, al revés, puntos, letra chica y corrida, torcido, en dos partes), pronunciación (homófonos, vocales largas, "casi"), palabras desde tarjetas, cuestionarios en la copia |
 | `tests/e2e-practice.mjs` | En Chromium (iPad horizontal y celular): trazos simulados de あ (tick y salto automático), い (mal) y 曜, generar y responder preguntas, "¿qué escuchaste?", pronunciación con dictado del teclado, listening (completar, preguntas y dictado completo) |
 | `tests/e2e.mjs` | En Chromium a tamaño iPhone (claro) e iPad (oscuro): alta de tarjeta, XSS, repaso con deshacer, Pomodoro y anotación, sesiones, exportar/importar, datos tras recargar, modo sin conexión, sin desbordes horizontales ni errores de consola |
 

@@ -4,7 +4,7 @@
 // resumen con la precisión y cómo salió cada kanji.
 
 import { h, icon, plural } from '../../ui/dom.js';
-import { field } from '../../ui/components.js';
+import { field, toggle } from '../../ui/components.js';
 import { openSheet, toast } from '../../ui/overlays.js';
 import { openLayer, resultPanel } from '../../ui/layer.js';
 import { createBoard } from '../../ui/writingBoard.js';
@@ -124,6 +124,7 @@ export function runRecall(ctx, chars) {
   let board = null;
   let advanceTimer = null;
   const results = []; // { ch, grade, strokes, mistakes, hints, meaning }
+  let autoNext = readPref('recallAutoNext', true);
   const cancelAdvance = () => clearTimeout(advanceTimer);
 
   const layer = openLayer({
@@ -180,6 +181,11 @@ export function runRecall(ctx, chars) {
             listenBtn,
             h('button', { class: 'btn btn--ghost', type: 'button', onClick: () => !board?.finished && (board?.restart(), (answer.hidden = true)) }, icon('reset', { size: 18 }), 'Borrar'),
           ),
+          h(
+            'div',
+            { class: 'write__prefs' },
+            toggle({ id: 'recall-auto-next', label: 'Pasar solo al siguiente', checked: autoNext, onChange: (v) => ((autoNext = v), writePref('recallAutoNext', v), v || cancelAdvance()) }),
+          ),
           h('div', { class: 'write__nav write__nav--single' }, nextBtn),
         ),
       ),
@@ -217,8 +223,9 @@ export function runRecall(ctx, chars) {
         status.className = `write__status write__status--${grade === 'perfect' ? 'ok' : grade === 'good' ? 'warn' : 'bad'}`;
         stamp(boardHost, grade);
         nextBtn.firstChild.textContent = index === chars.length - 1 ? 'Terminar' : 'Siguiente';
+        if (!autoNext) return;
         advanceTimer = setTimeout(() => {
-          if (chars[index] === ch && layer.body.isConnected) next();
+          if (autoNext && chars[index] === ch && layer.body.isConnected) next();
         }, ADVANCE_MS);
       },
     });

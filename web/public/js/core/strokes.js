@@ -134,7 +134,8 @@ export function compareStroke(user, reference, { transform = null, leniency = 1,
       const o = measure(u, resample(other), strokeLength(other), { known: Boolean(transform), leniency });
       // Sin conocer todavía tu letra (primer trazo), solo si la otra forma es mucho mejor.
       const better = transform ? o.shape <= m.shape * 1.3 : o.shape < m.shape * 0.5;
-      if (o.ok && o.place < m.place * 0.5 && better) {
+      // Si ya cae casi en su lugar (place chico), no es un error de orden aunque otro trazo esté cerca.
+      if (o.ok && m.place > 7 && o.place < m.place * 0.5 && better) {
         wrongOrder = true;
         break;
       }
@@ -175,4 +176,36 @@ function measure(u, r, refLen, { known, leniency }) {
   const ok = ratioOk && place <= placeLimit && shape <= shapeLimit && angle <= angleLimit;
   const reversed = !ok && !short && place <= placeLimit && angle > 120 && reversedShape <= shapeLimit && reversedShape < shape;
   return { ok, reversed, place, shape, shapeLimit };
+}
+
+/** Los primeros `length` de un trazo (para comparar contra la primera parte). */
+function prefixOf(points, length) {
+  const out = [points[0]];
+  let acc = 0;
+  for (let i = 1; i < points.length; i++) {
+    const d = dist(points[i - 1], points[i]);
+    if (acc + d >= length) {
+      const t = d ? (length - acc) / d : 0;
+      out.push({ x: points[i - 1].x + t * (points[i].x - points[i - 1].x), y: points[i - 1].y + t * (points[i].y - points[i - 1].y) });
+      return out;
+    }
+    acc += d;
+    out.push(points[i]);
+  }
+  return out;
+}
+
+/**
+ * ¿Lo dibujado es el COMIENZO del trazo de referencia? Pasa cuando alguien levanta el
+ * dedo a mitad de un trazo que en japonés va de un solo tirón (la esquina de 口, 日,
+ * 月...). En ese caso no se marca error: se espera la otra parte y se juntan.
+ */
+export function startsLike(user, reference, { transform = null, leniency = 1 } = {}) {
+  const t = transform ?? IDENTITY;
+  const u = undo(user, t);
+  const refLen = strokeLength(reference);
+  const userLen = strokeLength(u);
+  if (refLen < 25 || userLen < refLen * 0.2 || userLen > refLen * 0.85) return false;
+  const prefix = prefixOf(reference, userLen);
+  return compareStroke(user, prefix, { transform, leniency: leniency * 1.2 }).ok;
 }

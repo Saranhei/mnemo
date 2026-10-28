@@ -655,7 +655,7 @@ html.is-locked #toast-root { bottom: auto; top: calc(env(safe-area-inset-top, 0p
 @media (min-width: 760px) { .write { grid-template-columns: minmax(0, 1fr) 300px; } }
 .write__board { width: min(100%, 74dvh, 640px); aspect-ratio: 1; margin-inline: auto; }
 .board {
-  display: block; width: 100%; height: 100%; touch-action: none; user-select: none; -webkit-user-select: none;
+  display: block; width: 100%; height: 100%; touch-action: none; user-select: none; -webkit-user-select: none; -webkit-touch-callout: none;
   border-radius: 22px; background: var(--surface); border: 1.5px solid var(--line); cursor: crosshair;
 }
 .board__grid line { stroke: var(--line); stroke-width: 0.5; stroke-dasharray: 2 2; }
@@ -866,3 +866,6 @@ audio.player__media { background: transparent; }
 .nav__label { max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .dict-search .input--search, .dict-search .input--search:focus { border: 0; box-shadow: none; border-radius: 0; }
 .dict-search:focus-within { border-color: var(--focus); box-shadow: 0 0 0 3px color-mix(in srgb, var(--focus) 25%, transparent); }
+.board__ink-stroke.is-pending { stroke: color-mix(in srgb, var(--gr-good) 60%, var(--fg)); stroke-dasharray: 3 2; }
+.write__prefs { display: grid; gap: 2px; padding-top: 6px; border-top: 1px solid var(--line); }
+.write__prefs .toggle-row { padding: 6px 0; font-size: 14.5px; gap: 10px; }
