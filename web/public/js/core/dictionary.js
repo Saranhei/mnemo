@@ -73,18 +73,35 @@ function glossKeys(senses = []) {
   return keys;
 }
 
-/** Prepara las palabras para buscar rápido (se hace una vez, al cargar el diccionario). */
+const SEP = '\u0001';
+const EMPTY = [];
+
+/**
+ * Prepara las palabras para buscar (se hace una vez, al cargar el diccionario).
+ *
+ * Para cuidar la memoria (en iPhone el sistema cierra la página si usa demasiada), cada
+ * palabra guarda solo textos planos: las lecturas en kana y los significados, ya
+ * normalizados, cada grupo en un único string. El detalle de cada glosa se calcula
+ * recién cuando la palabra pasa el primer filtro.
+ */
 export function buildIndex(words) {
-  return words.map((w) => ({
-    w,
-    kanji: w.k ?? [],
-    kana: w.r.map(japaneseKey),
-    es: glossKeys(w.es),
-    en: glossKeys(w.en),
-    // Desempate: palabras con kanji más frecuentes primero; las solo katakana (préstamos), después.
-    tie: Math.min(3, (w.f ?? 0) / 300) + (!w.k && /^[ァ-ヺー・]+$/.test(w.r[0]) ? 4 : 0),
-  }));
+  const index = new Array(words.length);
+  for (let i = 0; i < words.length; i++) {
+    const w = words[i];
+    index[i] = {
+      w,
+      kanji: w.k ?? EMPTY,
+      kana: w.r.length === 1 ? japaneseKey(w.r[0]) : w.r.map(japaneseKey).join(SEP),
+      es: w.es ? spanishKey(stripParens(w.es.join(' '))) : '',
+      en: w.en ? spanishKey(stripParens(w.en.join(' '))) : '',
+      // Desempate: palabras con kanji más frecuentes primero; las solo katakana (préstamos), después.
+      tie: Math.min(3, (w.f ?? 0) / 300) + (!w.k && /^[ァ-ヺー・]+$/.test(w.r[0]) ? 4 : 0),
+    };
+  }
+  return index;
 }
+
+const kanaForms = (entry) => entry.kana.split(SEP);
 
 const isLatin = (q) => /^[a-z0-9\s'’-]+$/i.test(q);
 
@@ -128,9 +145,11 @@ export function search(index, query, { limit = 60 } = {}) {
   for (const entry of index) {
     let score = Infinity;
     if (japanese) score = Math.min(score, formScore(entry.kanji, raw));
-    if (kanaOk) score = Math.min(score, formScore(entry.kana, kanaQ) + (latin ? 2 : 0));
+    if (kanaOk && entry.kana.includes(kanaQ)) score = Math.min(score, formScore(kanaForms(entry), kanaQ) + (latin ? 2 : 0));
     if (meaningQ && meaningQ.length > 1) {
-      score = Math.min(score, meaningScore(entry.es, meaningQ, 1), meaningScore(entry.en, meaningQ, 4));
+      // Filtro rápido sobre el texto plano; el puntaje fino solo para las que pasan.
+      if (` ${entry.es} `.includes(` ${meaningQ} `)) score = Math.min(score, meaningScore(glossKeys(entry.w.es), meaningQ, 1));
+      if (` ${entry.en} `.includes(` ${meaningQ} `)) score = Math.min(score, meaningScore(glossKeys(entry.w.en), meaningQ, 4));
     }
     if (score === Infinity) continue;
     if (entry.w.c) score -= 6;

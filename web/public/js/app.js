@@ -45,7 +45,19 @@ const VIEWS = {
   settings: settingsView,
 };
 
-let route = { name: readPref('lastTab', 'decks'), params: {} };
+// Si la vez anterior la página se cerró antes de terminar de arrancar (por ejemplo,
+// el sistema la cerró por memoria en una pantalla pesada como el Diccionario), no se
+// vuelve a abrir en esa pantalla: se arranca en Mazos para no quedar en un bucle.
+const BOOT_KEY = 'mnemo.booting';
+const safeStorage = {
+  get: (k) => { try { return localStorage.getItem(k); } catch { return null; } },
+  set: (k, v) => { try { localStorage.setItem(k, v); } catch { /* sin almacenamiento */ } },
+  del: (k) => { try { localStorage.removeItem(k); } catch { /* sin almacenamiento */ } },
+};
+const crashedLastTime = safeStorage.get(BOOT_KEY) === '1';
+safeStorage.set(BOOT_KEY, '1');
+
+let route = { name: crashedLastTime ? 'decks' : readPref('lastTab', 'decks'), params: {} };
 if (!TABS.some((t) => t.id === route.name)) route = { name: 'decks', params: {} };
 
 let tickers = [];
@@ -59,7 +71,8 @@ const ctx = {
   navigate(name, params = {}) {
     route = { name, params };
     const tab = TABS.find((t) => t.routes.includes(name));
-    if (tab && tab.id === name) writePref('lastTab', name);
+    // El Diccionario no se recuerda como pestaña de inicio: cargarlo es lo más pesado.
+    if (tab && tab.id === name && name !== 'dictionary') writePref('lastTab', name);
     render({ scrollTop: true });
   },
   refresh: () => render(),
@@ -184,6 +197,9 @@ async function boot() {
     showInstallHint();
     requestPersistence();
   }
+  // Arrancó bien: si la app sigue viva unos segundos, se borra la marca de arranque.
+  setTimeout(() => safeStorage.del(BOOT_KEY), 4000);
+  if (crashedLastTime) toast('La app se había cerrado sola. Volví a Mazos; tus datos están bien.', { ms: 6000 });
   if (firstRun) toast('Te dejé un mazo de ejemplo para probar. Podés borrarlo cuando quieras.', { ms: 6000 });
   if (!store.lastSaveSucceeded()) toast('No se pudieron guardar los datos en este navegador.', { tone: 'error', ms: 6000 });
 }
