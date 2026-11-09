@@ -292,7 +292,7 @@ export async function deleteNotebook(id, now = Date.now()) {
   if (!nb) return;
   const pageIds = nb.pages.map((p) => p.id);
   const mediaIds = [];
-  for (const pid of pageIds) for (const item of await getInk(pid)) if (item.t === 'img' && item.m) mediaIds.push(item.m);
+  for (const pid of pageIds) for (const item of await getInk(pid)) if (item.m) mediaIds.push(item.m);
   if (nb.pdfMediaId) mediaIds.push(nb.pdfMediaId);
   state.notebooks = state.notebooks.map((n) => (n.id === id ? M.tombstone(n, now) : n));
   commit();

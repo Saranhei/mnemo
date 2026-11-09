@@ -5,6 +5,29 @@
 import { h, icon, clear } from './dom.js';
 import { sheetOpen } from './overlays.js';
 
+// Gesto "atrás" (Android, deslizar desde el borde en Safari, botón atrás del
+// navegador): cierra la capa abierta en vez de salir de la app. Cada capa agrega
+// una entrada al historial; al cerrarla con la ✕ se saca esa entrada.
+const open = [];
+let backPending = 0; // history.back() es asíncrono: lo que se abra mientras tanto espera
+const queued = [];
+addEventListener('popstate', (e) => {
+  if (backPending > 0) {
+    backPending -= 1;
+    if (backPending === 0) queued.splice(0).forEach((push) => push());
+    return;
+  }
+  // Se cierran las capas abiertas después de la entrada a la que se volvió.
+  const token = e.state?.mnemoLayer;
+  while (open.length && open.at(-1).token !== token) open.at(-1).close({ fromHistory: true });
+});
+// Al recargar con una capa abierta, la entrada actual queda marcada: se limpia.
+try {
+  if (history.state?.mnemoLayer) history.replaceState({ ...history.state, mnemoLayer: undefined }, '');
+} catch {
+  /* sin historial */
+}
+
 /**
  * @param {{title: string, onKey?: (e: KeyboardEvent) => void, onClose?: () => void}} opts
  * @returns {{body: HTMLElement, setStatus: (t: string) => void, setProgress: (p: number) => void, close: () => void, clear: () => void}}
@@ -43,10 +66,27 @@ export function openLayer({ title, onKey, onClose }) {
   document.documentElement.classList.add('is-locked');
   document.addEventListener('keydown', keyHandler);
 
+  const token = `${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 8)}`;
   let closed = false;
-  function close() {
+  const push = () => {
+    if (closed) return;
+    try {
+      history.pushState({ ...(history.state ?? {}), mnemoLayer: token }, '');
+    } catch {
+      /* sin historial (vista previa): la capa funciona igual */
+    }
+  };
+  if (backPending) queued.push(push);
+  else push();
+
+  function close({ fromHistory = false } = {}) {
     if (closed) return;
     closed = true;
+    open.splice(open.indexOf(entry), 1);
+    if (!fromHistory && history.state?.mnemoLayer === token) {
+      backPending += 1;
+      history.back();
+    }
     document.removeEventListener('keydown', keyHandler);
     document.documentElement.classList.remove('is-locked');
     globalThis.speechSynthesis?.cancel();
@@ -55,9 +95,12 @@ export function openLayer({ title, onKey, onClose }) {
     if (previousFocus instanceof HTMLElement) previousFocus.focus({ preventScroll: true });
   }
 
+  const entry = { close, token };
+  open.push(entry);
+
   return {
     body,
-    close,
+    close: () => close(),
     clear: () => clear(body),
     setStatus: (t) => (status.textContent = t),
     setProgress: (p) => {

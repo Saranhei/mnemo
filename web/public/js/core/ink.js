@@ -9,7 +9,8 @@
 // Además de trazos, una página puede tener:
 //   cinta:   { t: 'tape', k: diseño, c: color, w: ancho, p: [x1, y1, 0, x2, y2, 0] }
 //   sticker: { t: 'st', k: nombre, x, y, s: tamaño, r: giro }
-//   imagen:  { t: 'img', m: id del archivo en el dispositivo, x, y, w, h }
+//   imagen:  { t: 'img', m: id del archivo en el dispositivo, x, y, w, h, u?: 1 si es un sticker propio }
+//   cinta con diseño propio: como la cinta, más m (imagen del diseño) y a (ancho/alto de la imagen)
 
 export const PAGE_W = 1000;
 export const MAX_POINTS = 4000; // por trazo (un trazo larguísimo se corta)
@@ -17,6 +18,7 @@ export const MAX_POINTS = 4000; // por trazo (un trazo larguísimo se corta)
 export const TOOLS = Object.freeze({
   pen: { label: 'Lapicera', widths: [2.2, 3.6, 6] },
   hl: { label: 'Resaltador', widths: [14, 22, 32] },
+  tape: { label: 'Cinta', widths: [26, 40, 60] },
 });
 
 const round1 = (n) => Math.round(n * 10) / 10;
@@ -119,10 +121,10 @@ export function itemBox(item) {
   return null;
 }
 
-/** ¿La goma (círculo de radio r en x, y) toca el trazo, cinta o sticker? (las imágenes no se borran con la goma) */
+/** ¿La goma (círculo de radio r en x, y) toca el trazo, cinta o sticker? (las fotos no se borran con la goma; los stickers propios sí) */
 export function touches(stroke, x, y, r) {
-  if (stroke.t === 'img') return false;
-  if (stroke.t === 'st') {
+  if (stroke.t === 'img' && !stroke.u) return false;
+  if (stroke.t === 'st' || stroke.t === 'img') {
     const b = itemBox(stroke);
     return x > b.x - r && x < b.x + b.w + r && y > b.y - r && y < b.y + b.h + r;
   }
@@ -154,13 +156,19 @@ export function sanitizeStrokes(list, maxStrokes = 20000, mapMedia = (id) => id)
     }
     if (s.t === 'img') {
       const m = typeof s.m === 'string' ? mapMedia(s.m) : null;
-      if (m) out.push({ t: 'img', m, x: num(s.x, -500, 1500), y: num(s.y, -500, 5000), w: num(s.w, 10, 2000, 300), h: num(s.h, 10, 3000, 200) });
+      if (m) out.push({ t: 'img', m, x: num(s.x, -500, 1500), y: num(s.y, -500, 5000), w: num(s.w, 10, 2000, 300), h: num(s.h, 10, 3000, 200), ...(s.u ? { u: 1 } : {}) });
       continue;
     }
     if (!Array.isArray(s.p)) continue;
     if (s.t === 'tape') {
       const p = s.p.slice(0, 6).map((v) => num(v, -500, 5000));
-      if (p.length === 6) out.push({ t: 'tape', k: NAME.test(s.k ?? '') ? s.k : 'plain', c: COLOR.test(s.c ?? '') ? s.c : '#ff9f1c', w: num(s.w, 10, 120, 40), p });
+      const tape = { t: 'tape', k: NAME.test(s.k ?? '') ? s.k : 'plain', c: COLOR.test(s.c ?? '') ? s.c : '#ff9f1c', w: num(s.w, 10, 120, 40), p };
+      if (typeof s.m === 'string') {
+        const m = mapMedia(s.m);
+        if (!m) continue; // diseño propio cuya imagen no vino en el archivo
+        Object.assign(tape, { k: 'img', m, a: num(s.a, 0.1, 20, 4) });
+      }
+      if (p.length === 6) out.push(tape);
       continue;
     }
     const t = s.t === 'hl' ? 'hl' : 'pen';

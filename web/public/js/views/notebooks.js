@@ -19,7 +19,8 @@ import { PAGE_W, TOOLS, addPoint, penOutline, centerline, touches, itemBox } fro
 import { NOTEBOOK_LIMITS, notebookFileName } from '../core/notebookFile.js';
 import { pickFile, deliverFile } from '../services/device.js';
 import { openPdf, pdfInfo, renderPdfPage } from '../services/pdf.js';
-import { svg, drawPaper, PAPER_LABEL, TAPES, tapeShape, STICKERS, stickerShape, stickerPreview, paperPreview } from '../ui/paper.js';
+import { svg, drawPaper, PAPER_LABEL, TAPES, tapeShape, tapeImageDefs, tapePreview, STICKERS, stickerShape, stickerPreview, paperPreview } from '../ui/paper.js';
+import { pickColor, recentColors } from '../ui/colorWheel.js';
 
 const INK_COLORS = ['#1b1a24', '#3457d5', '#d0302f', '#1f8a5b', '#7b4dd8', '#ff9f1c'];
 const HL_COLORS = ['#ffe14d', '#7df0b4', '#7cd4ff', '#ff9ec2', '#ffb35c', '#c7a6ff'];
@@ -211,7 +212,7 @@ async function exportNotebook(ctx, id) {
   for (const p of nb.pages) {
     const ink = await getInk(p.id);
     for (const item of ink) {
-      if (item.t === 'img' && !images[item.m]) {
+      if (item.m && !images[item.m]) {
         const blob = await getMedia(item.m);
         if (blob) images[item.m] = { type: blob.type || 'image/jpeg', data: await toBase64(blob) };
       }
@@ -262,12 +263,70 @@ export async function saveImportedNotebook({ notebook, pdf, needsPdf, images }) 
   const pages = [];
   for (const p of notebook.pages) {
     const page = { id: newId(), pdfPage: pdfMediaId ? p.pdfPage : null, ratio: p.ratio, ...(p.paper ? { paper: p.paper } : {}) };
-    const ink = p.ink.map((item) => (item.t === 'img' ? { ...item, m: mediaMap[item.m] } : item)).filter((i) => i.t !== 'img' || i.m);
+    const ink = p.ink.map((item) => (item.m ? { ...item, m: mediaMap[item.m] } : item)).filter((i) => !('m' in i) || i.m);
     if (ink.length) await putInk(page.id, ink);
     pages.push(page);
   }
   store.updateNotebook(nb.id, { pages, pdfMediaId, pdfName: pdfMedia?.name ?? '' });
   return nb.id;
+}
+
+// ─────────────────── Stickers y cintas propios (biblioteca) ───────────────────
+// Las imágenes que el usuario agrega como sticker o diseño de cinta quedan en este
+// dispositivo (almacén "media"); la lista, en las preferencias. Al usarlas en una
+// página se guarda una copia aparte, así borrar de la biblioteca no rompe notas.
+
+const LIB = { sticker: 'nb.myStickers', tape: 'nb.myTapes' };
+const libList = (kind) => {
+  const list = readPref(LIB[kind], []);
+  return Array.isArray(list) ? list.filter((x) => typeof x?.id === 'string' && Number.isFinite(x.a)) : [];
+};
+
+async function addToLibrary(kind) {
+  const file = await pickFile('image/*', { asText: false, maxBytes: 30 * 1024 * 1024 });
+  if (!file) return null;
+  if (!/^image\//.test(file.type)) {
+    toast('Elegí una imagen (PNG con fondo transparente queda mejor).', { tone: 'error' });
+    return null;
+  }
+  try {
+    const { blob, width, height } = await shrinkImage(file.file, 600, true);
+    const id = newId();
+    await putMedia(id, blob);
+    writePref(LIB[kind], [...libList(kind), { id, a: Math.round((width / height) * 1000) / 1000 }]);
+    toast(kind === 'sticker' ? 'Sticker agregado.' : 'Diseño de cinta agregado.', { tone: 'ok' });
+    return id;
+  } catch (err) {
+    console.error(err);
+    toast('No se pudo usar esa imagen.', { tone: 'error' });
+    return null;
+  }
+}
+
+async function removeFromLibrary(kind, id) {
+  const ok = await confirmAction({ title: kind === 'sticker' ? '¿Quitar este sticker?' : '¿Quitar este diseño de cinta?', message: 'Se quita de tu colección. Lo que ya pegaste en los cuadernos queda.', confirmLabel: 'Quitar' });
+  if (!ok) return false;
+  writePref(LIB[kind], libList(kind).filter((x) => x.id !== id));
+  await deleteMedia(id);
+  return true;
+}
+
+const libUrls = new Map();
+async function libUrl(id) {
+  if (libUrls.has(id)) return libUrls.get(id);
+  const blob = await getMedia(id);
+  const url = blob ? URL.createObjectURL(blob) : '';
+  libUrls.set(id, url);
+  return url;
+}
+
+/** Copia una imagen de la biblioteca para usarla en una página. */
+async function copyMedia(id) {
+  const blob = await getMedia(id);
+  if (!blob) return null;
+  const mid = newId();
+  await putMedia(mid, blob);
+  return mid;
 }
 
 // ───────────────────────────── Editor ─────────────────────────────
@@ -278,6 +337,8 @@ const prefs = () => ({
   hlColor: readPref('nb.hlColor', HL_COLORS[0]),
   tapeColor: readPref('nb.tapeColor', TAPE_COLORS[0]),
   tape: readPref('nb.tape', 'stripes'),
+  tapeW: readPref('nb.tapeW', 1),
+  sticker: readPref('nb.sticker', 'star'),
   penW: readPref('nb.penW', 1),
   hlW: readPref('nb.hlW', 1),
   finger: readPref('nb.finger', false),
@@ -292,6 +353,9 @@ export function openNotebook(ctx, id) {
   let pdfDoc = null;
   let pdfLoading = null;
   let penSeen = false;
+  // Entrada: Pencil/lápiz escribe; dedos desplazan, pellizcan para zoom y tocan con
+  // dos dedos para deshacer (tres para rehacer), como en GoodNotes y Procreate.
+  const input = { touches: new Map(), penDown: 0, cancelActive: null };
   const pages = new Map(); // id de página → controlador
   const history = []; // { pageId, before, after }
   const future = [];
@@ -306,6 +370,7 @@ export function openNotebook(ctx, id) {
     },
     onClose: () => {
       document.removeEventListener('keydown', shortcuts);
+      removeEventListener('resize', fitBase);
       observer?.disconnect();
       for (const p of pages.values()) p.flush();
       pdfDoc?.destroy();
@@ -365,14 +430,7 @@ export function openNotebook(ctx, id) {
   scroller.appendChild(pagesHost);
   layer.body.append(bar, scroller);
 
-  // El Apple Pencil en Safari, sin esto, a veces desplaza la página en vez de escribir.
-  scroller.addEventListener('touchstart', (e) => {
-    if (opt.tool === 'select') return;
-    if ([...e.touches].some((t) => t.touchType === 'stylus')) e.preventDefault();
-  }, { passive: false });
-  scroller.addEventListener('touchmove', (e) => {
-    if ([...e.touches].some((t) => t.touchType === 'stylus') && opt.tool !== 'select') e.preventDefault();
-  }, { passive: false });
+  setupGestures();
 
   function savePref(k, v) {
     opt[k] = v;
@@ -392,14 +450,21 @@ export function openNotebook(ctx, id) {
 
   function colorRow(colors, key) {
     const row = h('div', { class: 'nb-colors', role: 'radiogroup', 'aria-label': 'Color' });
-    const custom = h('input', { type: 'color', class: 'nb-color-custom', value: opt[key], 'aria-label': 'Otro color', title: 'Otro color' });
-    const mark = () => {
-      for (const b of row.querySelectorAll('[data-c]')) b.classList.toggle('is-on', b.dataset.c === opt[key]);
+    const draw = () => {
+      // Los propios: el actual (si no es de la paleta) y los últimos de la rueda.
+      const extra = [opt[key], ...recentColors()].filter((c, i, all) => !colors.includes(c) && all.indexOf(c) === i).slice(0, 3);
+      row.replaceChildren(
+        ...[...colors, ...extra].map((c) => h('button', { class: `nb-color${c === opt[key] ? ' is-on' : ''}`, type: 'button', dataset: { c }, style: { '--sw': c }, 'aria-label': `Color ${c}`, onClick: () => (savePref(key, c), draw()) })),
+        h('button', { class: 'nb-color-wheel', type: 'button', 'aria-label': 'Rueda de colores', title: 'Rueda de colores', onClick: async () => {
+          const c = await pickColor(opt[key]);
+          if (c) {
+            savePref(key, c);
+            draw();
+          }
+        } }),
+      );
     };
-    for (const c of colors) row.appendChild(h('button', { class: 'nb-color', type: 'button', dataset: { c }, style: { '--sw': c }, 'aria-label': `Color ${c}`, onClick: () => (savePref(key, c), mark()) }));
-    custom.addEventListener('input', () => (savePref(key, custom.value), mark()));
-    row.appendChild(custom);
-    mark();
+    draw();
     return row;
   }
 
@@ -419,37 +484,204 @@ export function openNotebook(ctx, id) {
     if (opt.tool === 'pen') options.append(colorRow(INK_COLORS, 'penColor'), widthRow('penW', 'pen'));
     else if (opt.tool === 'hl') options.append(colorRow(HL_COLORS, 'hlColor'), widthRow('hlW', 'hl'));
     else if (opt.tool === 'tape') {
-      const kinds = h('div', { class: 'nb-tapes' }, TAPES.map((t) => h('button', { class: `nb-tape${opt.tape === t.id ? ' is-on' : ''}`, type: 'button', dataset: { k: t.id }, 'aria-label': `Cinta ${t.label}`, title: t.label, onClick: () => {
-        savePref('tape', t.id);
-        for (const b of kinds.children) b.classList.toggle('is-on', b.dataset.k === t.id);
-      } }, t.label)));
-      options.append(colorRow(TAPE_COLORS, 'tapeColor'), kinds);
+      const custom = opt.tape.startsWith('u:');
+      options.append(custom ? h('span', {}) : colorRow(TAPE_COLORS, 'tapeColor'), widthRow('tapeW', 'tape'), libraryRow('tape'));
     } else if (opt.tool === 'sticker') {
-      options.append(h('p', { class: 'nb-hint' }, 'Tocá un sticker y después el lugar de la hoja.'),
-        h('div', { class: 'nb-stickers' }, Object.entries(STICKERS).map(([k, s]) => h('button', { class: `nb-sticker${opt.sticker === k ? ' is-on' : ''}`, type: 'button', 'aria-label': s.label, title: s.label, onClick: (e) => {
-          opt.sticker = k;
-          for (const b of e.currentTarget.parentNode.children) b.classList.toggle('is-on', b === e.currentTarget);
-        } }, stickerPreview(k, 34)))));
-      opt.sticker ??= 'star';
-      options.querySelector('.nb-sticker')?.classList.toggle('is-on', opt.sticker === 'star');
+      options.append(libraryRow('sticker'));
     } else if (opt.tool === 'eraser') options.append(h('p', { class: 'nb-hint' }, 'Pasá la goma por un trazo, cinta o sticker para borrarlo.'));
-    else if (opt.tool === 'select') options.append(h('p', { class: 'nb-hint' }, 'Tocá una imagen o sticker para moverlo; la esquina cambia el tamaño. Con el dedo se desplaza la hoja.'));
+    else if (opt.tool === 'select') options.append(h('p', { class: 'nb-hint' }, 'Tocá una imagen o sticker para moverlo; la esquina cambia el tamaño.'));
     options.appendChild(toggle({ id: 'nb-finger', label: 'Escribir con el dedo', checked: opt.finger, onChange: (v) => (savePref('finger', v), applyTouchMode()) }));
+    options.appendChild(h('p', { class: 'nb-hint nb-hint--gestures' }, 'Un dedo: mover la hoja · Pellizcar: zoom · Tocar con 2 dedos: deshacer · con 3: rehacer'));
   }
 
   function applyTouchMode() {
-    const drawWithFinger = opt.finger && opt.tool !== 'select';
-    scroller.classList.toggle('is-finger', drawWithFinger);
+    if (opt.finger) penSeen = false;
   }
 
-  function setZoom(z) {
-    const zoom = Math.max(0.5, Math.min(3, Math.round(z * 4) / 4));
-    const anchor = currentPageId;
-    savePref('zoom', zoom);
+  /** Paleta de cintas o stickers: los de la app, los propios y "Agregar". */
+  function libraryRow(kind) {
+    const key = kind === 'tape' ? 'tape' : 'sticker';
+    const row = h('div', { class: kind === 'tape' ? 'nb-tapes' : 'nb-stickers', role: 'radiogroup', 'aria-label': kind === 'tape' ? 'Diseño de cinta' : 'Stickers' });
+    const choose = (id) => {
+      savePref(key, id);
+      if (kind === 'tape') drawOptions();
+      else for (const b of row.querySelectorAll('[data-k]')) b.classList.toggle('is-on', b.dataset.k === id);
+    };
+    const cls = kind === 'tape' ? 'nb-tape' : 'nb-sticker';
+    const builtIn = kind === 'tape'
+      ? TAPES.map((t) => h('button', { class: `${cls}${opt.tape === t.id ? ' is-on' : ''}`, type: 'button', dataset: { k: t.id }, 'aria-label': `Cinta ${t.label}`, title: t.label, onClick: () => choose(t.id) }, tapePreview(t.id, opt.tapeColor)))
+      : Object.entries(STICKERS).map(([k, st]) => h('button', { class: `${cls}${opt.sticker === k ? ' is-on' : ''}`, type: 'button', dataset: { k }, 'aria-label': st.label, title: st.label, onClick: () => choose(k) }, stickerPreview(k, 34)));
+    const own = libList(kind).map((x) => {
+      const k = `u:${x.id}`;
+      const img = h('img', { alt: '', class: kind === 'tape' ? 'nb-tape__img' : 'nb-sticker__img', draggable: 'false' });
+      libUrl(x.id).then((url) => url && (img.src = url));
+      return h('span', { class: 'nb-own' },
+        h('button', { class: `${cls}${opt[key] === k ? ' is-on' : ''}`, type: 'button', dataset: { k }, 'aria-label': kind === 'tape' ? 'Cinta propia' : 'Sticker propio', onClick: () => choose(k) }, img),
+        h('button', { class: 'nb-own__x', type: 'button', 'aria-label': 'Quitar de mi colección', onClick: async () => {
+          if (!(await removeFromLibrary(kind, x.id))) return;
+          if (opt[key] === k) savePref(key, kind === 'tape' ? 'stripes' : 'star');
+          drawOptions();
+        } }, '×'),
+      );
+    });
+    const add = h('button', { class: `${cls} nb-add`, type: 'button', title: kind === 'tape' ? 'Agregar un diseño de cinta (una imagen)' : 'Agregar un sticker (una imagen)', 'aria-label': kind === 'tape' ? 'Agregar diseño de cinta' : 'Agregar sticker', onClick: async () => {
+      const id = await addToLibrary(kind);
+      if (id) {
+        savePref(key, `u:${id}`);
+        drawOptions();
+      }
+    } }, icon('plus', { size: 18 }));
+    row.append(...builtIn, ...own, add);
+    return row;
+  }
+
+  const ZMIN = 0.5;
+  const ZMAX = 4;
+  let rerenderTimer = null;
+  /** Cambia el zoom dejando el punto (fx, fy) de las páginas debajo de (cx, cy) en la pantalla. */
+  function applyZoom(z, anchor) {
+    const zoom = Math.max(ZMIN, Math.min(ZMAX, z));
+    const r0 = pagesHost.getBoundingClientRect();
+    const a = anchor ?? (() => {
+      const sr = scroller.getBoundingClientRect();
+      const cx = sr.left + sr.width / 2;
+      const cy = sr.top + sr.height / 2;
+      return { fx: (cx - r0.left) / r0.width, fy: (cy - r0.top) / r0.height, cx, cy };
+    })();
+    opt.zoom = zoom;
     pagesHost.style.setProperty('--zoom', String(zoom));
     zoomLabel.textContent = `${Math.round(zoom * 100)} %`;
-    for (const p of pages.values()) p.resized();
-    pages.get(anchor)?.el.scrollIntoView({ block: 'start' });
+    const r1 = pagesHost.getBoundingClientRect();
+    scroller.scrollLeft += r1.left + a.fx * r1.width - a.cx;
+    scroller.scrollTop += r1.top + a.fy * r1.height - a.cy;
+    // Los PDF se vuelven a dibujar con la nitidez nueva cuando el zoom se queda quieto.
+    clearTimeout(rerenderTimer);
+    rerenderTimer = setTimeout(() => {
+      writePref('nb.zoom', opt.zoom);
+      for (const p of pages.values()) p.resized();
+    }, 250);
+    return a;
+  }
+  function setZoom(z) {
+    applyZoom(Math.round(z * 4) / 4);
+  }
+  function fitBase() {
+    const w = scroller.clientWidth;
+    if (w) pagesHost.style.setProperty('--base', `${Math.min(w - 28, 900)}px`);
+  }
+
+  // ─── Gestos ───
+  function setupGestures() {
+    const t = input.touches;
+    let gesture = null; // { kind: 'pan' | 'pinch', ... }
+    let tap = null; // { start, max, moved }
+    let palm = false; // el Pencil apoyó mientras había dedos: se ignoran hasta levantarlos
+    let inertia = 0;
+    const stopInertia = () => cancelAnimationFrame(inertia);
+    const pts = () => [...t.values()];
+    const startGesture = () => {
+      const p = pts();
+      if (p.length >= 2) {
+        const [a, b] = p;
+        const cx = (a.x + b.x) / 2;
+        const cy = (a.y + b.y) / 2;
+        const r = pagesHost.getBoundingClientRect();
+        gesture = { kind: 'pinch', d0: Math.hypot(a.x - b.x, a.y - b.y) || 1, z0: opt.zoom, fx: (cx - r.left) / r.width, fy: (cy - r.top) / r.height };
+      } else if (p.length === 1) gesture = { kind: 'pan', x: p[0].x, y: p[0].y, vx: 0, vy: 0, t: performance.now() };
+      else gesture = null;
+    };
+
+    scroller.addEventListener('pointerdown', (e) => {
+      if (e.pointerType === 'pen') {
+        input.penDown += 1;
+        stopInertia();
+        if (t.size) palm = true;
+        gesture = null;
+        return;
+      }
+      if (e.pointerType !== 'touch') return;
+      stopInertia();
+      t.set(e.pointerId, { x: e.clientX, y: e.clientY, x0: e.clientX, y0: e.clientY, claimed: Boolean(e.nbClaimed) });
+      if (t.size === 1) tap = { start: performance.now(), max: 1, moved: 0 };
+      else if (tap) tap.max = Math.max(tap.max, t.size);
+      if (input.penDown || palm) return;
+      if (t.size >= 2) {
+        input.cancelActive?.();
+        input.cancelActive = null;
+        startGesture();
+      } else if (!e.nbClaimed) startGesture();
+    });
+
+    scroller.addEventListener('pointermove', (e) => {
+      const p = t.get(e.pointerId);
+      if (!p) return;
+      p.x = e.clientX;
+      p.y = e.clientY;
+      if (tap) tap.moved = Math.max(tap.moved, Math.hypot(p.x - p.x0, p.y - p.y0));
+      if (!gesture || palm || input.penDown) return;
+      if (gesture.kind === 'pan') {
+        const now = performance.now();
+        const dx = p.x - gesture.x;
+        const dy = p.y - gesture.y;
+        scroller.scrollLeft -= dx;
+        scroller.scrollTop -= dy;
+        const dt = Math.max(1, now - gesture.t);
+        gesture.vx = gesture.vx * 0.6 + (dx / dt) * 0.4;
+        gesture.vy = gesture.vy * 0.6 + (dy / dt) * 0.4;
+        Object.assign(gesture, { x: p.x, y: p.y, t: now });
+      } else if (gesture.kind === 'pinch' && t.size >= 2) {
+        const [a, b] = pts();
+        const d = Math.hypot(a.x - b.x, a.y - b.y);
+        applyZoom(gesture.z0 * (d / gesture.d0), { fx: gesture.fx, fy: gesture.fy, cx: (a.x + b.x) / 2, cy: (a.y + b.y) / 2 });
+      }
+    });
+
+    const up = (e) => {
+      if (e.pointerType === 'pen') {
+        input.penDown = Math.max(0, input.penDown - 1);
+        return;
+      }
+      if (!t.delete(e.pointerId)) return;
+      if (t.size === 0) {
+        // Toque rápido con dos dedos = deshacer; con tres = rehacer.
+        if (tap && e.type === 'pointerup' && !palm && performance.now() - tap.start < 320 && tap.moved < 14) {
+          if (tap.max === 2) undo();
+          else if (tap.max >= 3) redo();
+        }
+        if (gesture?.kind === 'pan' && performance.now() - gesture.t < 60) glide(gesture.vx * 16, gesture.vy * 16);
+        gesture = null;
+        tap = null;
+        palm = false;
+      } else if (!palm && !input.penDown) startGesture(); // de pellizcar a desplazar con el dedo que queda
+    };
+    scroller.addEventListener('pointerup', up);
+    scroller.addEventListener('pointercancel', up);
+
+    // Envión al soltar (como el desplazamiento del sistema).
+    function glide(vx, vy) {
+      const step = () => {
+        if (Math.abs(vx) < 0.3 && Math.abs(vy) < 0.3) return;
+        scroller.scrollLeft -= vx;
+        scroller.scrollTop -= vy;
+        vx *= 0.94;
+        vy *= 0.94;
+        inertia = requestAnimationFrame(step);
+      };
+      inertia = requestAnimationFrame(step);
+    }
+
+    // Pellizco en el trackpad (Mac, iPad con teclado) y Ctrl + rueda.
+    scroller.addEventListener('wheel', (e) => {
+      if (!e.ctrlKey) return;
+      e.preventDefault();
+      const r = pagesHost.getBoundingClientRect();
+      applyZoom(opt.zoom * Math.exp(-e.deltaY * 0.01), { fx: (e.clientX - r.left) / r.width, fy: (e.clientY - r.top) / r.height, cx: e.clientX, cy: e.clientY });
+    }, { passive: false });
+    // Safari: que el pellizco no agrande toda la app.
+    for (const ev of ['gesturestart', 'gesturechange']) scroller.addEventListener(ev, (e) => e.preventDefault());
+    // Sin menú de "copiar/lupa" al mantener apretado.
+    scroller.addEventListener('contextmenu', (e) => e.preventDefault());
+    addEventListener('resize', fitBase);
   }
 
   // ─── Historial (deshacer / rehacer) ───
@@ -574,7 +806,7 @@ export function openNotebook(ctx, id) {
     const [page] = nb.pages.splice(idx, 1);
     store.updateNotebook(nb.id, { pages: nb.pages });
     const ctl = pages.get(page.id);
-    for (const item of ctl?.items ?? []) if (item.t === 'img') await deleteMedia(item.m);
+    for (const item of ctl?.items ?? []) if (item.m) await deleteMedia(item.m);
     ctl?.el.remove();
     pages.delete(page.id);
     await deleteInk([page.id]);
@@ -622,7 +854,8 @@ export function openNotebook(ctx, id) {
         if (ctl.loaded) return ctl.ready;
         ctl.loaded = true;
         ctl.ready = (async () => {
-          ctl.items = await getInk(page.id);
+          const stored = await getInk(page.id);
+          ctl.items = [...stored, ...ctl.items]; // por si se escribió antes de terminar de cargar
           ctl.redraw();
         })();
         return ctl.ready;
@@ -701,21 +934,29 @@ export function openNotebook(ctx, id) {
     function itemNode(item) {
       if (item.t === 'pen') return svg('path', { d: penOutline(item), fill: item.c });
       if (item.t === 'hl') return svg('path', { d: centerline(item), fill: 'none', stroke: item.c, 'stroke-width': item.w, 'stroke-linecap': 'round', 'stroke-linejoin': 'round', 'stroke-opacity': 0.42, class: 'nb-hl' });
+      if (item.t === 'tape' && item.m) {
+        const fill = tapeImageDefs(defs, item, ctl.imageUrls.get(item.m));
+        if (!ctl.imageUrls.has(item.m)) mediaUrl(item.m).then((url) => url && tapeImageDefs(defs, item, url));
+        return tapeShape(item, defs, fill);
+      }
       if (item.t === 'tape') return tapeShape(item, defs);
       if (item.t === 'st') return stickerShape(item);
       if (item.t === 'img') {
         const image = svg('image', { x: item.x, y: item.y, width: item.w, height: item.h, preserveAspectRatio: 'xMidYMid meet' });
         const cached = ctl.imageUrls.get(item.m);
         if (cached) image.setAttribute('href', cached);
-        else getMedia(item.m).then((blob) => {
-          if (!blob) return;
-          const url = URL.createObjectURL(blob);
-          ctl.imageUrls.set(item.m, url);
-          image.setAttribute('href', url);
-        });
+        else mediaUrl(item.m).then((url) => url && image.setAttribute('href', url));
         return image;
       }
       return null;
+    }
+    async function mediaUrl(id) {
+      if (ctl.imageUrls.has(id)) return ctl.imageUrls.get(id);
+      const blob = await getMedia(id);
+      if (!blob) return null;
+      const url = URL.createObjectURL(blob);
+      ctl.imageUrls.set(id, url);
+      return url;
     }
 
     // ─── Dibujo ───
@@ -738,11 +979,18 @@ export function openNotebook(ctx, id) {
 
     s.addEventListener('pointerdown', (e) => {
       currentPageId = page.id;
-      if (!ctl.loaded) return;
+      if (!ctl.loaded) ctl.load();
+      // Otro dedo ya apoyado: es un gesto (zoom, deshacer), no un trazo.
+      if (e.pointerType === 'touch' && (input.touches.size > 0 || input.penDown)) return;
       if (opt.tool === 'select') return startSelect(e);
       if (!accepts(e)) return;
       e.preventDefault();
-      s.setPointerCapture(e.pointerId);
+      e.nbClaimed = true;
+      try {
+        s.setPointerCapture(e.pointerId);
+      } catch {
+        /* algunos navegadores no capturan el lápiz: se dibuja igual */
+      }
       const pt = toPage(e);
       if (!pt) return;
       clearSelection();
@@ -755,21 +1003,62 @@ export function openNotebook(ctx, id) {
         const path = svg('path', {});
         liveG.appendChild(path);
         drawing = { id: e.pointerId, kind: 'stroke', stroke, path, before };
+        input.cancelActive = cancelDrawing;
         paintLive();
       } else if (opt.tool === 'eraser') {
         drawing = { id: e.pointerId, kind: 'erase', before, removed: 0 };
         eraseAt(pt);
       } else if (opt.tool === 'tape') {
-        const item = { t: 'tape', k: opt.tape, c: opt.tapeColor, w: 40, p: [pt.x, pt.y, 0, pt.x + 1, pt.y, 0] };
+        const item = { t: 'tape', k: opt.tape, c: opt.tapeColor, w: TOOLS.tape.widths[opt.tapeW] ?? 40, p: [pt.x, pt.y, 0, pt.x + 1, pt.y, 0] };
+        const own = opt.tape.startsWith('u:') ? libList('tape').find((x) => `u:${x.id}` === opt.tape) : null;
+        if (own) Object.assign(item, { k: 'img', m: tapeMedia(own.id), a: own.a });
         drawing = { id: e.pointerId, kind: 'tape', item, before };
+        input.cancelActive = cancelDrawing;
         paintTape();
       } else if (opt.tool === 'sticker') {
-        ctl.items.push({ t: 'st', k: opt.sticker ?? 'star', x: Math.round(pt.x), y: Math.round(pt.y), s: 110, r: 0 });
+        const own = opt.sticker.startsWith('u:') ? libList('sticker').find((x) => `u:${x.id}` === opt.sticker) : null;
+        if (own) return placeOwnSticker(own, pt, before);
+        ctl.items.push({ t: 'st', k: STICKERS[opt.sticker] ? opt.sticker : 'star', x: Math.round(pt.x), y: Math.round(pt.y), s: 110, r: 0 });
         ctl.redraw();
         ctl.save();
         record(ctl, before);
       }
     });
+
+    /** Un sticker propio es una imagen chica que se borra con la goma. */
+    async function placeOwnSticker(own, pt, before) {
+      const mid = await copyMedia(own.id);
+      if (!mid) return toast('Ese sticker ya no está en el dispositivo.', { tone: 'error' });
+      const w = 150;
+      const hh = Math.round(w / own.a);
+      ctl.items.push({ t: 'img', u: 1, m: mid, x: Math.round(pt.x - w / 2), y: Math.round(pt.y - hh / 2), w, h: hh });
+      ctl.redraw();
+      ctl.save();
+      record(ctl, before);
+    }
+
+    /** Copia del diseño de cinta para esta página (una sola vez por página y diseño). */
+    const tapeCopies = new Map();
+    function tapeMedia(libId) {
+      if (!tapeCopies.has(libId)) {
+        const mid = newId();
+        tapeCopies.set(libId, mid);
+        getMedia(libId).then((blob) => blob && putMedia(mid, blob)).then(() => ctl.redraw());
+      }
+      return tapeCopies.get(libId);
+    }
+
+    function cancelDrawing() {
+      if (!drawing) return;
+      const d = drawing;
+      drawing = null;
+      liveG.replaceChildren();
+      if (d.kind === 'erase' || d.kind === 'move' || d.kind === 'resize') {
+        ctl.items = d.before;
+        ctl.redraw();
+        if (selected?.page === ctl) ctl.drawSelection(ctl.items[selected.index]);
+      }
+    }
 
     s.addEventListener('pointermove', (e) => {
       if (!drawing || e.pointerId !== drawing.id) return;
@@ -793,6 +1082,7 @@ export function openNotebook(ctx, id) {
       if (!drawing || e.pointerId !== drawing.id) return;
       const d = drawing;
       drawing = null;
+      input.cancelActive = null;
       liveG.replaceChildren();
       if (d.kind === 'stroke') {
         ctl.items.push(d.stroke);
@@ -819,9 +1109,13 @@ export function openNotebook(ctx, id) {
       }
     };
     s.addEventListener('pointerup', finish);
+    // Si el sistema cancela el toque (por ejemplo, un gesto de iPadOS), el trazo ya
+    // hecho se guarda igual en vez de perderse.
     s.addEventListener('pointercancel', (e) => {
-      if (drawing?.kind === 'stroke') liveG.replaceChildren();
-      if (drawing && e.pointerId === drawing.id) drawing = null;
+      if (!drawing || e.pointerId !== drawing.id) return;
+      if (drawing.kind === 'stroke' && drawing.stroke.p.length > 3) finish(e);
+      else cancelDrawing();
+      input.cancelActive = null;
     });
 
     function paintLive() {
@@ -841,7 +1135,7 @@ export function openNotebook(ctx, id) {
       }
     }
     function paintTape() {
-      liveG.replaceChildren(tapeShape(drawing.item, defs));
+      liveG.replaceChildren(itemNode(drawing.item));
     }
     function eraseAt(pt) {
       const r = 12;
@@ -862,12 +1156,15 @@ export function openNotebook(ctx, id) {
         const b = itemBox(ctl.items[selected.index]);
         if (Math.hypot(pt.x - (b.x + b.w), pt.y - b.y) < 26) {
           e.preventDefault();
+          e.nbClaimed = true;
           return deleteSelected();
         }
         if (Math.hypot(pt.x - (b.x + b.w), pt.y - (b.y + b.h)) < 30) {
           e.preventDefault();
+          e.nbClaimed = true;
           s.setPointerCapture(e.pointerId);
           drawing = { id: e.pointerId, kind: 'resize', start: pt, box: b, orig: { ...ctl.items[selected.index] }, before: ctl.items.slice() };
+          input.cancelActive = cancelDrawing;
           return;
         }
       }
@@ -878,8 +1175,10 @@ export function openNotebook(ctx, id) {
           if (selected && selected.page !== ctl) clearSelection();
           selected = { page: ctl, index: i };
           ctl.drawSelection(ctl.items[i]);
+          e.nbClaimed = true;
           s.setPointerCapture(e.pointerId);
           drawing = { id: e.pointerId, kind: 'move', start: pt, orig: { ...ctl.items[i] }, before: ctl.items.slice() };
+          input.cancelActive = cancelDrawing;
           return;
         }
       }
@@ -907,8 +1206,11 @@ export function openNotebook(ctx, id) {
   }
 
   // ─── Armado ───
+  opt.zoom = Math.max(ZMIN, Math.min(ZMAX, Number(opt.zoom) || 1));
   pagesHost.style.setProperty('--zoom', String(opt.zoom));
   zoomLabel.textContent = `${Math.round(opt.zoom * 100)} %`;
+  fitBase();
+  requestAnimationFrame(fitBase);
   nb.pages.forEach((p, i) => pagesHost.appendChild(mountPage(p, i).el));
   drawOptions();
   applyTouchMode();
@@ -948,10 +1250,10 @@ export function openNotebook(ctx, id) {
   mo.observe(pagesHost, { childList: true });
 }
 
-/** Achica una imagen a 1600 px como máximo (las fotos del celular pesan mucho). */
-async function shrinkImage(file) {
+/** Achica una imagen (las fotos del celular pesan mucho). `keepAlpha`: siempre PNG, para stickers con fondo transparente. */
+async function shrinkImage(file, max = 1600, keepAlpha = false) {
   const bitmap = await createImageBitmap(file);
-  const scale = Math.min(1, 1600 / Math.max(bitmap.width, bitmap.height));
+  const scale = Math.min(1, max / Math.max(bitmap.width, bitmap.height));
   const w = Math.round(bitmap.width * scale);
   const hh = Math.round(bitmap.height * scale);
   const canvas = document.createElement('canvas');
@@ -959,7 +1261,7 @@ async function shrinkImage(file) {
   canvas.height = hh;
   canvas.getContext('2d').drawImage(bitmap, 0, 0, w, hh);
   bitmap.close?.();
-  const type = file.type === 'image/png' ? 'image/png' : 'image/jpeg';
+  const type = keepAlpha || /png|webp|gif/.test(file.type) ? 'image/png' : 'image/jpeg';
   const blob = await new Promise((resolve) => canvas.toBlob(resolve, type, 0.86));
   canvas.width = 0;
   return { blob, width: w, height: hh };

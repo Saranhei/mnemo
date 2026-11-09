@@ -99,11 +99,23 @@ export function drawPaper(g, paper, h, bg) {
 
 // ─────────────────────────── Cintas (washi tape) ───────────────────────────
 
+/** Vista previa de una cinta para la paleta. */
+export function tapePreview(k, c) {
+  const s = svg('svg', { viewBox: '0 0 80 24', width: 64, height: 19, 'aria-hidden': 'true' });
+  const defs = svg('defs');
+  s.append(defs, tapeShape({ k, c, w: 22, p: [2, 12, 0, 78, 12, 0] }, defs));
+  return s;
+}
+
 export const TAPES = [
   { id: 'plain', label: 'Lisa' },
   { id: 'stripes', label: 'Rayada' },
   { id: 'dots', label: 'Lunares' },
   { id: 'check', label: 'Cuadros' },
+  { id: 'hearts', label: 'Corazones' },
+  { id: 'stars', label: 'Estrellas' },
+  { id: 'zigzag', label: 'Zigzag' },
+  { id: 'gingham', label: 'Vichy' },
 ];
 
 /** Defs de los patrones de cinta para un color (se agregan una vez por página y color). */
@@ -114,13 +126,30 @@ export function tapeDefs(defs, k, c) {
   if (k === 'stripes') p = svg('pattern', { id, width: 16, height: 16, patternUnits: 'userSpaceOnUse', patternTransform: 'rotate(45)' }, svg('rect', { width: 16, height: 16, fill: c, 'fill-opacity': 0.45 }), svg('rect', { width: 7, height: 16, fill: '#ffffff', 'fill-opacity': 0.55 }));
   else if (k === 'dots') p = svg('pattern', { id, width: 18, height: 18, patternUnits: 'userSpaceOnUse' }, svg('rect', { width: 18, height: 18, fill: c, 'fill-opacity': 0.45 }), svg('circle', { cx: 9, cy: 9, r: 3.5, fill: '#ffffff', 'fill-opacity': 0.75 }));
   else if (k === 'check') p = svg('pattern', { id, width: 20, height: 20, patternUnits: 'userSpaceOnUse' }, svg('rect', { width: 20, height: 20, fill: c, 'fill-opacity': 0.3 }), svg('rect', { width: 10, height: 10, fill: c, 'fill-opacity': 0.35 }), svg('rect', { x: 10, y: 10, width: 10, height: 10, fill: c, 'fill-opacity': 0.35 }));
+  else if (k === 'hearts') p = svg('pattern', { id, width: 24, height: 20, patternUnits: 'userSpaceOnUse' }, svg('rect', { width: 24, height: 20, fill: c, 'fill-opacity': 0.45 }), svg('path', { d: 'M12 15c-4-3-6-5-6-7.5a3 3 0 0 1 6-1 3 3 0 0 1 6 1c0 2.5-2 4.5-6 7.5z', fill: '#ffffff', 'fill-opacity': 0.8 }));
+  else if (k === 'stars') p = svg('pattern', { id, width: 26, height: 20, patternUnits: 'userSpaceOnUse' }, svg('rect', { width: 26, height: 20, fill: c, 'fill-opacity': 0.45 }), svg('path', { d: 'M13 3l2.2 4.6 5 .6-3.7 3.4 1 5-4.5-2.5-4.5 2.5 1-5-3.7-3.4 5-.6z', fill: '#ffffff', 'fill-opacity': 0.8 }));
+  else if (k === 'zigzag') p = svg('pattern', { id, width: 20, height: 20, patternUnits: 'userSpaceOnUse' }, svg('rect', { width: 20, height: 20, fill: c, 'fill-opacity': 0.45 }), svg('path', { d: 'M0 13l5-6 5 6 5-6 5 6', fill: 'none', stroke: '#ffffff', 'stroke-width': 2.5, 'stroke-opacity': 0.85 }));
+  else if (k === 'gingham') p = svg('pattern', { id, width: 16, height: 16, patternUnits: 'userSpaceOnUse' }, svg('rect', { width: 16, height: 16, fill: '#ffffff', 'fill-opacity': 0.35 }), svg('rect', { width: 8, height: 16, fill: c, 'fill-opacity': 0.35 }), svg('rect', { width: 16, height: 8, fill: c, 'fill-opacity': 0.35 }));
   else p = svg('pattern', { id, width: 10, height: 10, patternUnits: 'userSpaceOnUse' }, svg('rect', { width: 10, height: 10, fill: c, 'fill-opacity': 0.5 }));
   defs.appendChild(p);
   return id;
 }
 
+/** Diseño propio: la imagen se repite a lo largo de la cinta. `url` es la imagen (blob:). */
+export function tapeImageDefs(defs, item, url) {
+  const id = `tapeimg-${item.m}-${Math.round(item.w)}`;
+  let p = defs.querySelector(`#${CSS.escape(id)}`);
+  if (!p) {
+    const tw = item.w * item.a;
+    p = svg('pattern', { id, width: tw, height: item.w, y: -item.w / 2, patternUnits: 'userSpaceOnUse' }, svg('image', { width: tw, height: item.w, preserveAspectRatio: 'none', opacity: 0.88 }));
+    defs.appendChild(p);
+  }
+  if (url) p.firstChild.setAttribute('href', url);
+  return id;
+}
+
 /** Cinta recta entre dos puntos, con bordes dentados como la de papel. */
-export function tapeShape(item, defs) {
+export function tapeShape(item, defs, fillId = null) {
   const [x1, y1, , x2, y2] = item.p;
   const len = Math.max(1, Math.hypot(x2 - x1, y2 - y1));
   const ang = (Math.atan2(y2 - y1, x2 - x1) * 180) / Math.PI;
@@ -131,7 +160,7 @@ export function tapeShape(item, defs) {
   d += `H0`;
   for (let y = w / 2; y > -w / 2; y -= tooth * 2) d += `L${tooth} ${Math.max(-w / 2, y - tooth)}L0 ${Math.max(-w / 2, y - tooth * 2)}`;
   d += 'Z';
-  return svg('path', { d, fill: `url(#${tapeDefs(defs, item.k, item.c)})`, transform: `translate(${x1} ${y1}) rotate(${ang})` });
+  return svg('path', { d, fill: `url(#${fillId ?? tapeDefs(defs, item.k, item.c)})`, transform: `translate(${x1} ${y1}) rotate(${ang})` });
 }
 
 // ─────────────────────────── Stickers ───────────────────────────

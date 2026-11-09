@@ -109,3 +109,17 @@ test('Importar reconoce un cuaderno', () => {
   assert.equal(r.kind, 'notebook');
   assert.equal(r.notebook.paper, 'grid-s');
 });
+
+test('Stickers y cintas propios: se borran con la goma y se validan al importar', () => {
+  const own = { t: 'img', u: 1, m: 'a', x: 0, y: 0, w: 100, h: 100 };
+  assert.ok(touches(own, 50, 50, 2), 'sticker propio se borra');
+  assert.ok(!touches({ ...own, u: undefined }, 50, 50, 2), 'una foto no');
+  const out = sanitizeStrokes([
+    own,
+    { t: 'tape', k: 'stars', c: '#ff0000', w: 40, p: [0, 0, 0, 10, 0, 0], m: 'a', a: 99 },
+    { t: 'tape', k: 'stars', c: '#ff0000', w: 40, p: [0, 0, 0, 10, 0, 0], m: 'falta' },
+  ], 100, (id) => (id === 'a' ? 'b' : null));
+  assert.equal(out.length, 2);
+  assert.equal(out[0].u, 1);
+  assert.deepEqual([out[1].k, out[1].m, out[1].a], ['img', 'b', 20]);
+});

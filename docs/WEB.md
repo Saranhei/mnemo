@@ -274,7 +274,20 @@ Notas a mano, al estilo GoodNotes: hojas en blanco o sobre un PDF importado.
 - **Coordenadas:** toda página mide 1000 de ancho (el alto sale de la proporción de la hoja o del PDF). Los trazos no dependen del zoom ni del tamaño de pantalla.
 - **Hojas** (`ui/paper.js`): lisa, rayas, cuadrícula y puntos (3 tamaños cada una), genkō yōshi (columnas verticales con espacio para furigana), rayas con margen y Cornell. Se dibujan en SVG; cada página puede tener su propia hoja. Color de papel: blanco, crema, celeste o oscuro.
 - **Herramientas:** lapicera (el grosor sigue la presión del Apple Pencil: `core/ink.js` arma un contorno relleno con la presión suavizada), resaltador (semitransparente, `multiply`), goma de trazo entero, cintas washi (4 diseños), 10 stickers originales, imágenes (se achican a 1600 px), mover/agrandar/borrar imágenes y stickers, 6 colores + selector libre, 3 grosores, deshacer/rehacer (200 pasos, ⌘Z), zoom 50–300 %, agregar/borrar páginas.
-- **Apple Pencil vs. dedo:** el Pencil escribe y el dedo desplaza. En Safari el Pencil a veces desplaza en vez de escribir: se evita con `preventDefault` en `touchstart` cuando `touchType === 'stylus'`. "Escribir con el dedo" es opcional; una vez que se usó el Pencil, el dedo se ignora para dibujar (apoyo de la palma).
+- **Entrada y gestos:** la zona de las hojas tiene `touch-action: none`, así el navegador no se queda con ningún toque (antes, en iPad, Safari cancelaba los trazos del Pencil con `pointercancel` al interpretarlos como desplazamiento). Todo se maneja con Pointer Events, igual en iPadOS y Android:
+  | Entrada | Qué hace |
+  |---|---|
+  | Pencil / lápiz (`pointerType: 'pen'`) | Escribe con la herramienta elegida (presión incluida) |
+  | Un dedo | Desplaza la hoja, con envión al soltar. Con "Escribir con el dedo", dibuja |
+  | Pellizcar con dos dedos | Zoom (50–400 %) alrededor de los dedos; también desplaza |
+  | Tocar con dos dedos / con tres | Deshacer / rehacer (como GoodNotes y Procreate) |
+  | Trackpad: pellizcar o Ctrl + rueda | Zoom |
+  | Dedos mientras el Pencil está apoyado | Se ignoran (palma) |
+  | Gesto "atrás" (Android, borde en Safari) | Cierra el cuaderno (`ui/layer.js` agrega una entrada al historial por capa; vale para todas las prácticas) |
+  Si el sistema igual cancela un trazo, lo dibujado hasta ese momento se guarda. Un segundo dedo cancela el trazo con el dedo en curso (era un gesto).
+- **Zoom:** ancho, márgenes y separación de páginas escalan con `--zoom`, y el punto bajo los dedos queda fijo. Los PDF se vuelven a dibujar con la nitidez nueva 250 ms después de soltar.
+- **Colores:** 6 por herramienta, los últimos elegidos y una rueda de colores propia (`ui/colorWheel.js`: tono, intensidad, brillo y código `#rrggbb`), igual en todos los sistemas.
+- **Stickers y cintas propios:** cualquier imagen (mejor PNG transparente) se suma a "tu colección" (almacén `media` + lista en preferencias). Al pegarlo en una página se guarda una copia, así quitar algo de la colección no rompe las notas. El sticker propio es una imagen con `u: 1` (se borra con la goma); la cinta propia repite la imagen a lo largo (`m` y `a` = proporción). 8 diseños de cinta incluidos y 3 grosores.
 - **PDF:** pdf.js se carga recién al abrir un PDF, con `isEvalSupported: false` (la CSP no permite `eval`) y los cMaps para PDF en japonés. Solo se dibujan las páginas cerca de la pantalla (`IntersectionObserver`) y se liberan las lejanas: cada página dibujada ocupa varios MB y el iPhone cierra la app si usa demasiada memoria. Densidad máxima 2× y 2400 px de ancho.
 - **Compartir:** "Exportar para otro dispositivo" arma un `.mnemo-notebook.json` con trazos, imágenes y el PDF (si pesa hasta 40 MB; si no, al importar se pide elegir el mismo PDF). Se abre con **Ajustes → Importar**. Los cuadernos no van en la copia de seguridad general porque los PDF pueden pesar cientos de MB.
 

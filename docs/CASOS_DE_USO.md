@@ -251,11 +251,13 @@ Para Genki I hay un archivo aparte con una lista por lección (L3–L12) y una c
 
 1. Pestaña **Cuadernos → Nuevo cuaderno**: nombre, tipo de hoja (lisa; rayas, cuadrícula o puntos en 3 tamaños; genkō yōshi; rayas con margen; Cornell), color del papel y de la tapa.
 2. Herramientas arriba: **Lapicera** (con presión del Apple Pencil), **Resaltador**, **Goma** (borra el trazo, cinta o sticker que toca), **Cinta** (arrastrar para pegarla), **Stickers** (elegir y tocar la hoja), **Mover** (imágenes y stickers: arrastrar, la esquina azul cambia el tamaño, la cruz roja lo quita) e **Imagen** (foto o archivo).
-3. Colores: 6 por herramienta y uno libre (círculo de colores). Grosor: fino, medio o grueso.
+3. Colores: 6 por herramienta más los propios (ver 7). Grosor: fino, medio o grueso (también en las cintas).
 4. **Deshacer / Rehacer** (también ⌘Z y ⌘⇧Z con teclado), **− / +** para el zoom.
 5. **⋯ (Páginas):** agregar una página después de la actual o al final, con la hoja que quieras; cambiar la hoja de la página actual; borrar la página.
-6. El dedo desplaza la hoja; **Escribir con el dedo** permite dibujar sin Pencil (en iPhone).
-7. Todo se guarda solo, en el dispositivo.
+6. Gestos: un dedo desplaza la hoja, pellizcar hace zoom, tocar con dos dedos deshace y con tres rehace. El gesto "atrás" del sistema cierra el cuaderno. **Escribir con el dedo** permite dibujar sin Pencil (en iPhone).
+7. **Colores propios:** el círculo de colores abre una rueda (o se escribe el código, por ejemplo `#12a4b6`); los últimos elegidos quedan a mano.
+8. **Stickers y cintas propios:** en Stickers o Cinta, el botón **+** agrega una imagen a tu colección; la **×** la quita (lo ya pegado queda).
+9. Todo se guarda solo, en el dispositivo.
 
 ## CU-23 · Escribir sobre un PDF
 
