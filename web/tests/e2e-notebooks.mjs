@@ -260,6 +260,18 @@ if (PDF) {
   await toEnd();
   assert.equal(await page.locator('.nb-page').count(), n0 + 1, 'no se apilan hojas vacías');
   step('final del PDF: hoja rayada nueva, sin apilar vacías');
+  // Tirar con el dedo estando al final: agrega otra aunque la última esté vacía.
+  await page.waitForTimeout(400);
+  {
+    const x = 600;
+    const y = 600;
+    await ptr('pointerdown', 61, 'touch', x, y);
+    for (let i = 1; i <= 10; i++) await ptr('pointermove', 61, 'touch', x, y - i * 20);
+    await ptr('pointerup', 61, 'touch', x, y - 200);
+  }
+  await page.waitForTimeout(600);
+  assert.equal(await page.locator('.nb-page').count(), n0 + 2, 'tirar al final agrega una hoja');
+  step('tirar con el dedo al final agrega otra hoja');
   await page.getByRole('button', { name: 'Cerrar', exact: true }).click();
 }
 await page.getByRole('button', { name: /^Abrir Japonés/ }).click();

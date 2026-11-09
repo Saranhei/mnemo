@@ -407,6 +407,25 @@ export function openNotebook(ctx, id) {
   let pdfLoading = null;
   let penSeen = false;
   let checkEnd = () => {};
+  // "Tirar" hacia arriba estando al final: agrega una hoja aunque la última esté vacía.
+  let pull = 0;
+  const atBottom = () => scroller.scrollTop + scroller.clientHeight >= scroller.scrollHeight - 2;
+  const PULL_TO_ADD = 110;
+  function pullBy(amount) {
+    pull = Math.max(0, pull + amount);
+    pagesHost.style.transition = 'none';
+    pagesHost.style.transform = pull ? `translateY(${-Math.min(pull, 160) * 0.45}px)` : '';
+    if (pull >= PULL_TO_ADD) {
+      releasePull();
+      checkEnd({ force: true });
+    }
+  }
+  function releasePull() {
+    if (!pull) return;
+    pull = 0;
+    pagesHost.style.transition = 'transform 0.25s ease';
+    pagesHost.style.transform = '';
+  }
   // Entrada: Pencil/lápiz escribe; dedos desplazan, pellizcan para zoom y tocan con
   // dos dedos para deshacer (tres para rehacer), como en GoodNotes y Procreate.
   const input = { touches: new Map(), penDown: 0, cancelActive: null };
@@ -695,7 +714,10 @@ export function openNotebook(ctx, id) {
         const dy = p.y - gesture.y;
         scroller.scrollLeft -= dx;
         scroller.scrollTop -= dy;
-        if (dy < 0) checkEnd();
+        if (dy < 0) {
+          if (atBottom()) pullBy(-dy);
+          checkEnd();
+        } else if (pull) pullBy(-dy);
         const dt = Math.max(1, now - gesture.t);
         gesture.vx = gesture.vx * 0.6 + (dx / dt) * 0.4;
         gesture.vy = gesture.vy * 0.6 + (dy / dt) * 0.4;
@@ -714,6 +736,7 @@ export function openNotebook(ctx, id) {
       }
       if (!t.delete(e.pointerId)) return;
       if (t.size === 0) {
+        releasePull();
         // Sin eventos táctiles (algunos navegadores de escritorio): toques con Pointer Events.
         if (!HAS_TOUCH && tap && !palm) handleTap(tap.max, performance.now() - tap.start, tap.moved, e.clientX, e.clientY);
         if (gesture?.kind === 'pan' && performance.now() - gesture.t < 60) glide(gesture.vx * 16, gesture.vy * 16);
@@ -1417,8 +1440,8 @@ export function openNotebook(ctx, id) {
   // cuando ya no hay más para bajar) se agrega una hoja.
   let appending = false;
   const openedAt = performance.now();
-  checkEnd = async () => {
-    if (appending || performance.now() - openedAt < 1000) return;
+  checkEnd = async ({ force = false } = {}) => {
+    if (appending || (!force && performance.now() - openedAt < 1000)) return;
     const er = endZone.getBoundingClientRect();
     const sr = scroller.getBoundingClientRect();
     if (er.top > sr.bottom - er.height * 0.5) return;
@@ -1428,14 +1451,29 @@ export function openNotebook(ctx, id) {
     appending = true;
     try {
       await ctl.load();
-      if (!last.pdfPage && ctl.items.length === 0) return; // la última está vacía: no se apilan hojas
-      await insertPage(nb.pages.length, templateAt(nb.pages.length - 1), { scroll: false });
+      // Llegar al final agrega una hoja si la última tiene algo; "tirar" la agrega siempre.
+      if (!force && !last.pdfPage && ctl.items.length === 0) return;
+      const added = await insertPage(nb.pages.length, templateAt(nb.pages.length - 1), { scroll: false });
+      if (force) added.el.scrollIntoView({ behavior: 'smooth', block: 'start' });
     } finally {
       appending = false;
     }
   };
   scroller.addEventListener('scroll', () => checkEnd(), { passive: true });
-  scroller.addEventListener('wheel', (e) => e.deltaY > 0 && !e.ctrlKey && checkEnd(), { passive: true });
+  let wheelPull = 0;
+  let wheelTimer = null;
+  scroller.addEventListener('wheel', (e) => {
+    if (e.ctrlKey || e.deltaY <= 0) return;
+    checkEnd();
+    if (!atBottom()) return;
+    wheelPull += e.deltaY;
+    clearTimeout(wheelTimer);
+    wheelTimer = setTimeout(() => (wheelPull = 0), 400);
+    if (wheelPull > 500) {
+      wheelPull = 0;
+      checkEnd({ force: true });
+    }
+  }, { passive: true });
 }
 
 /** Abre una imagen para dibujarla en un canvas (con respaldo para Safari viejos). */
