@@ -10,6 +10,7 @@ import { live } from '../core/model.js';
 import { deliverFile, pickFile } from '../services/device.js';
 import { putMedia } from '../data/storage.js';
 import { newId } from '../core/model.js';
+import { saveImportedNotebook } from '../views/notebooks.js';
 
 const ACCEPT = '.json,.txt,.tsv,application/json,text/plain,text/tab-separated-values';
 
@@ -34,6 +35,14 @@ export async function importFlow(ctx) {
       const id = await saveImportedListening(result);
       toast(`Importado el ejercicio "${result.listening.title}".`, { tone: 'ok' });
       return { route: 'listening-edit', id };
+    }
+
+    if (result.kind === 'notebook') {
+      toast('Importando el cuaderno…');
+      const id = await saveImportedNotebook(result);
+      if (!id) return null;
+      toast(`Importado el cuaderno "${result.notebook.name}".`, { tone: 'ok' });
+      return { route: 'notebooks', id };
     }
 
     const s = result.state;

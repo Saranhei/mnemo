@@ -7,7 +7,8 @@
 
 const DB_NAME = 'mnemo';
 const STORE = 'kv';
-const MEDIA = 'media'; // audios y videos de los ejercicios de listening
+const MEDIA = 'media'; // audios y videos de los ejercicios de listening, PDF de los cuadernos
+const INK = 'ink'; // trazos de cada página de los cuadernos (clave: id de la página)
 const STATE_KEY = 'state';
 const LS_KEY = 'mnemo.state';
 
@@ -19,11 +20,12 @@ function openDB() {
   if (dbPromise) return dbPromise;
   dbPromise = new Promise((resolve, reject) => {
     if (!('indexedDB' in globalThis)) return reject(new Error('IndexedDB no disponible'));
-    const req = indexedDB.open(DB_NAME, 2);
+    const req = indexedDB.open(DB_NAME, 3);
     req.onupgradeneeded = () => {
       const db = req.result;
       if (!db.objectStoreNames.contains(STORE)) db.createObjectStore(STORE);
       if (!db.objectStoreNames.contains(MEDIA)) db.createObjectStore(MEDIA);
+      if (!db.objectStoreNames.contains(INK)) db.createObjectStore(INK);
     };
     req.onsuccess = () => resolve(req.result);
     req.onerror = () => reject(req.error);
@@ -84,6 +86,7 @@ export async function clearAll() {
   try {
     await idbRequest('readwrite', (s) => s.delete(STATE_KEY));
     await idbRequest('readwrite', (s) => s.clear(), MEDIA);
+    await idbRequest('readwrite', (s) => s.clear(), INK);
   } catch {
     /* sin IndexedDB no hay nada que borrar ahí */
   }
@@ -178,5 +181,32 @@ export function writePref(key, value) {
     localStorage.setItem(`mnemo.pref.${key}`, JSON.stringify(value));
   } catch {
     /* preferencia no guardada: no es crítico */
+  }
+}
+
+// ─────────── Trazos de los cuadernos (solo en este dispositivo) ───────────
+
+/** @returns {Promise<object[]>} los trazos de una página (vacío si no hay). */
+export async function getInk(pageId) {
+  try {
+    return (await idbRequest('readonly', (s) => s.get(pageId), INK)) ?? [];
+  } catch {
+    return [];
+  }
+}
+
+export async function putInk(pageId, strokes) {
+  await idbRequest('readwrite', (s) => (strokes.length ? s.put(strokes, pageId) : s.delete(pageId)), INK);
+}
+
+export async function deleteInk(pageIds) {
+  try {
+    await idbRequest('readwrite', (s) => {
+      let last = null;
+      for (const id of pageIds) last = s.delete(id);
+      return last ?? s.count();
+    }, INK);
+  } catch {
+    /* nada que borrar */
   }
 }

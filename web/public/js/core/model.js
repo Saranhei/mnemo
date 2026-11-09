@@ -30,10 +30,10 @@ export function newId() {
 }
 
 /** Colecciones que se guardan y se sincronizan. */
-export const COLLECTIONS = Object.freeze(['decks', 'cards', 'sessions', 'quizzes', 'listenings', 'kanjiSets']);
+export const COLLECTIONS = Object.freeze(['decks', 'cards', 'sessions', 'quizzes', 'listenings', 'kanjiSets', 'notebooks']);
 
 export function emptyState() {
-  return { decks: [], cards: [], sessions: [], quizzes: [], listenings: [], kanjiSets: [] };
+  return { decks: [], cards: [], sessions: [], quizzes: [], listenings: [], kanjiSets: [], notebooks: [] };
 }
 
 /** Completa colecciones que falten (datos guardados por versiones anteriores). */
@@ -80,6 +80,46 @@ export function newSession(now) {
  */
 export function newQuiz({ name, questions = [] }, now) {
   return { id: newId(), name, questions, createdAt: now, updatedAt: now };
+}
+
+/**
+ * Tipos de hoja de un cuaderno (rayas, cuadrícula y puntos en tres tamaños; genkō
+ * yōshi para escribir japonés en cuadros; Cornell con margen y resumen).
+ */
+export const PAPERS = Object.freeze([
+  'blank',
+  'lined-s', 'lined-m', 'lined-l',
+  'grid-s', 'grid-m', 'grid-l',
+  'dots-s', 'dots-m', 'dots-l',
+  'genko', 'margin', 'cornell',
+]);
+export const PAPER_COLORS = Object.freeze(['#ffffff', '#fbf6e9', '#eef3fb', '#25252d']);
+export const NOTEBOOK_COLORS = Object.freeze(['#7b4dd8', '#ff5d73', '#ff9f1c', '#3ddc97', '#4cc9f0', '#2f3140']);
+
+/**
+ * Cuaderno: metadatos y lista de páginas. Los trazos de cada página y el PDF (si lo
+ * hay) se guardan aparte, en el dispositivo (ver data/storage.js), porque pesan.
+ * Cada página: { id, pdfPage: número de página del PDF o null, ratio: alto/ancho,
+ * paper?: hoja distinta a la del cuaderno }.
+ */
+export function newPage({ paper = null, ratio = 1.414 } = {}) {
+  return { id: newId(), pdfPage: null, ratio, ...(PAPERS.includes(paper) ? { paper } : {}) };
+}
+
+export function newNotebook({ name, paper = 'lined-m', paperColor = PAPER_COLORS[0], color = NOTEBOOK_COLORS[0], pdf = null, pages = 1 }, now) {
+  const ratio = pdf?.ratio ?? 1.414;
+  return {
+    id: newId(),
+    name,
+    paper: PAPERS.includes(paper) ? paper : 'lined-m',
+    paperColor: PAPER_COLORS.includes(paperColor) ? paperColor : PAPER_COLORS[0],
+    color: NOTEBOOK_COLORS.includes(color) ? color : NOTEBOOK_COLORS[0],
+    pdfMediaId: pdf?.mediaId ?? null,
+    pdfName: pdf?.name ?? '',
+    pages: Array.from({ length: pdf ? pdf.pageCount : pages }, (_, i) => ({ id: newId(), pdfPage: pdf ? i + 1 : null, ratio })),
+    createdAt: now,
+    updatedAt: now,
+  };
 }
 
 /**
@@ -241,5 +281,5 @@ export function exampleState(now) {
   const cards = rows.map(([front, back, pronunciation, example, kind], i) =>
     newCard({ deckId: deck.id, front, back, pronunciation, example, kind }, now + i),
   );
-  return { decks: [deck], cards, sessions: [], quizzes: [], listenings: [], kanjiSets: [] };
+  return { decks: [deck], cards, sessions: [], quizzes: [], listenings: [], kanjiSets: [], notebooks: [] };
 }

@@ -16,6 +16,7 @@
 import { clean, stripHTML, isValidId, clampNumber, clampDate, MAX_NAME, fileSafeName } from './sanitize.js';
 import { KINDS, GENDERS, newDeck, newCard, uniqueKanji } from './model.js';
 import { INITIAL_EASE } from './sm2.js';
+import { sanitizeNotebookFile, NotebookFileError } from './notebookFile.js';
 
 export const LIMITS = Object.freeze({
   deckFileBytes: 5 * 1024 * 1024,
@@ -77,6 +78,13 @@ export function parseImport(text, filename, byteSize = text.length) {
     raw = JSON.parse(text);
   } catch {
     throw errors.invalid();
+  }
+  if (raw && raw.app === 'mnemo' && raw.type === 'notebook') {
+    try {
+      return { kind: 'notebook', ...sanitizeNotebookFile(raw) };
+    } catch (err) {
+      throw err instanceof NotebookFileError ? new TransferError('invalid', err.message) : err;
+    }
   }
   if (raw && raw.app === 'mnemo' && raw.type === 'listening') {
     return { kind: 'listening', ...sanitizeListeningFile(raw) };

@@ -83,6 +83,15 @@ kanji, kana, romaji o por significado; cada palabra se puede agregar a un mazo y
 kanji practicar o sumar a tus listas. Datos de JMdict y KANJIDIC2 © EDRDG, licencia
 CC BY-SA 4.0 (`public/dict/LICENSE.txt`).
 
+**Cuadernos:** notas a mano con el Apple Pencil (con presión) o con el dedo, al estilo
+GoodNotes. Hojas lisas, rayadas, cuadriculadas, de puntos (en 3 tamaños), genkō yōshi,
+con margen o Cornell; lapicera, resaltador, goma, cintas, stickers e imágenes; colores
+libres, deshacer y zoom. También se importa un PDF (un libro, un cuaderno de ejercicios)
+para escribir encima. Todo queda en el dispositivo; un cuaderno se pasa a otro con
+**⋯ → Exportar** y **Ajustes → Importar**. Los PDF se leen con
+[pdf.js](https://mozilla.github.io/pdf.js/) de Mozilla, licencia Apache 2.0
+(`public/vendor/pdfjs-4.10.38/LICENSE.txt`).
+
 ## 4. Pasar las palabras de un dispositivo a otro
 
 No hay servidor ni cuentas, así que nadie más ve tus datos. La sincronización se hace con un archivo:

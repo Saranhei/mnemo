@@ -7,7 +7,7 @@
 import * as M from '../core/model.js';
 import { schedule } from '../core/sm2.js';
 import { insertDeckExport } from '../core/transfer.js';
-import { loadState, saveState, clearAll, deleteMedia } from './storage.js';
+import { loadState, saveState, clearAll, deleteMedia, getInk, deleteInk } from './storage.js';
 
 let state = M.emptyState();
 const listeners = new Set();
@@ -265,4 +265,37 @@ export function addToKanjiSet(id, text, now = Date.now()) {
 export function deleteKanjiSet(id, now = Date.now()) {
   state.kanjiSets = state.kanjiSets.map((k) => (k.id === id ? M.tombstone(k, now) : k));
   commit();
+}
+
+// ──────────────────────────── Cuadernos ────────────────────────────
+
+export const getNotebook = (id) => findLive(state.notebooks, id);
+
+export function createNotebook(fields, now = Date.now()) {
+  const nb = M.newNotebook(fields, now);
+  state.notebooks.push(nb);
+  commit();
+  return nb;
+}
+
+/** Cambia nombre, hoja, colores o la lista de páginas. */
+export function updateNotebook(id, fields, now = Date.now()) {
+  const nb = getNotebook(id);
+  if (!nb) return;
+  Object.assign(nb, fields, { updatedAt: now });
+  commit();
+}
+
+/** Borra el cuaderno y, del dispositivo, sus trazos, imágenes y PDF. */
+export async function deleteNotebook(id, now = Date.now()) {
+  const nb = getNotebook(id);
+  if (!nb) return;
+  const pageIds = nb.pages.map((p) => p.id);
+  const mediaIds = [];
+  for (const pid of pageIds) for (const item of await getInk(pid)) if (item.t === 'img' && item.m) mediaIds.push(item.m);
+  if (nb.pdfMediaId) mediaIds.push(nb.pdfMediaId);
+  state.notebooks = state.notebooks.map((n) => (n.id === id ? M.tombstone(n, now) : n));
+  commit();
+  await deleteInk(pageIds);
+  for (const m of mediaIds) await deleteMedia(m);
 }

@@ -18,6 +18,7 @@ web/
 │   ├── icons/                  Íconos de la app
 │   ├── strokes/                Trazos de kana y kanji (KanjiVG, CC BY-SA 3.0)
 │   ├── dict/                   Diccionario sin conexión (JMdict y KANJIDIC2, CC BY-SA 4.0)
+│   ├── vendor/pdfjs-4.10.38/   Lector de PDF de Mozilla (Apache 2.0), sin cambios
 │   └── js/
 │       ├── app.js              Arranque, navegación, reloj, instalación
 │       ├── core/               Lógica pura, sin navegador (tiene pruebas)
@@ -30,13 +31,15 @@ web/
 │       │   ├── strokes.js      Comparación de trazos dibujados con los de referencia
 │       │   ├── dictionary.js   Búsqueda en el diccionario (kanji, kana, romaji, significado)
 │       │   ├── listening.js    Espacios a completar y comparación del dictado
+│       │   ├── ink.js          Tinta de los cuadernos: presión, contorno, goma, limpieza
+│       │   ├── notebookFile.js Archivo para compartir un cuaderno (validación)
 │       │   └── practice.js     Palabras para practicar a partir de las tarjetas
 │       ├── data/
 │       │   ├── storage.js      IndexedDB (con respaldo en localStorage)
 │       │   └── store.js        Estado en memoria + todas las acciones que lo cambian
 │       ├── services/           Voz, sonido, pantalla encendida, archivos, Pomodoro
 │       ├── ui/                 DOM, componentes, hojas, avisos, pizarra de escritura, listas de kanji
-│       └── views/              Pantallas: mazos, repaso, diccionario, Pomodoro, sesiones, ajustes
+│       └── views/              Pantallas: mazos, repaso, diccionario, cuadernos, Pomodoro, sesiones, ajustes
 │           └── practice/       Práctica: escritura, kanji de memoria, preguntas, pronunciación, listening
 ├── src/sw.template.js          Service worker (modo sin conexión)
 ├── scripts/build.mjs           Arma dist/ y dist-preview/
@@ -258,6 +261,23 @@ Ejercicios de textos largos (`listenings` en el modelo):
   practicarlo en Escritura, sumarlo a una lista, y abrir la búsqueda en Takoboto o
   Jisho (enlaces externos con `noopener noreferrer`; no se les manda nada más).
 
+## Cuadernos (`views/notebooks.js`)
+
+Notas a mano, al estilo GoodNotes: hojas en blanco o sobre un PDF importado.
+
+- **Dónde se guarda cada cosa:**
+  | Qué | Dónde | Por qué |
+  |---|---|---|
+  | Nombre, hoja, colores, lista de páginas | estado de la app (`notebooks`) | Se sincroniza como lo demás (tombstones, `updatedAt`) |
+  | Trazos y elementos de cada página | IndexedDB, almacén `ink` (clave = id de página) | Pueden ser miles de puntos: se guarda solo la página que cambió, 300 ms después del último trazo |
+  | PDF e imágenes | IndexedDB, almacén `media` (Blob) | No entran en el estado ni en la copia de seguridad |
+- **Coordenadas:** toda página mide 1000 de ancho (el alto sale de la proporción de la hoja o del PDF). Los trazos no dependen del zoom ni del tamaño de pantalla.
+- **Hojas** (`ui/paper.js`): lisa, rayas, cuadrícula y puntos (3 tamaños cada una), genkō yōshi (columnas verticales con espacio para furigana), rayas con margen y Cornell. Se dibujan en SVG; cada página puede tener su propia hoja. Color de papel: blanco, crema, celeste o oscuro.
+- **Herramientas:** lapicera (el grosor sigue la presión del Apple Pencil: `core/ink.js` arma un contorno relleno con la presión suavizada), resaltador (semitransparente, `multiply`), goma de trazo entero, cintas washi (4 diseños), 10 stickers originales, imágenes (se achican a 1600 px), mover/agrandar/borrar imágenes y stickers, 6 colores + selector libre, 3 grosores, deshacer/rehacer (200 pasos, ⌘Z), zoom 50–300 %, agregar/borrar páginas.
+- **Apple Pencil vs. dedo:** el Pencil escribe y el dedo desplaza. En Safari el Pencil a veces desplaza en vez de escribir: se evita con `preventDefault` en `touchstart` cuando `touchType === 'stylus'`. "Escribir con el dedo" es opcional; una vez que se usó el Pencil, el dedo se ignora para dibujar (apoyo de la palma).
+- **PDF:** pdf.js se carga recién al abrir un PDF, con `isEvalSupported: false` (la CSP no permite `eval`) y los cMaps para PDF en japonés. Solo se dibujan las páginas cerca de la pantalla (`IntersectionObserver`) y se liberan las lejanas: cada página dibujada ocupa varios MB y el iPhone cierra la app si usa demasiada memoria. Densidad máxima 2× y 2400 px de ancho.
+- **Compartir:** "Exportar para otro dispositivo" arma un `.mnemo-notebook.json` con trazos, imágenes y el PDF (si pesa hasta 40 MB; si no, al importar se pide elegir el mismo PDF). Se abre con **Ajustes → Importar**. Los cuadernos no van en la copia de seguridad general porque los PDF pueden pesar cientos de MB.
+
 ## Modo sin conexión
 
 `scripts/build.mjs` calcula un número de versión a partir del contenido de los
@@ -265,6 +285,10 @@ archivos y genera `sw.js` con la lista completa. Al instalarse, el service worke
 guarda todos los archivos en un caché propio de esa versión; las páginas se sirven
 desde ahí. Cuando se publica una versión nueva, se descarga entera, se activa y la
 app se recarga una vez (después de guardar los datos).
+
+Hay tres cachés que no cambian con cada versión y se llenan a medida que se usan:
+trazos de kanji (`mnemo-strokes-v1`), diccionario (`mnemo-dict-v1`) y el lector de
+PDF (`mnemo-vendor-v1`, ~4 MB; su carpeta lleva la versión en el nombre).
 
 ## Seguridad
 
@@ -294,6 +318,8 @@ app se recarga una vez (después de guardar los datos).
 | `tests/e2e-kanji.mjs` | En Chromium: crear y ampliar una lista, escribir 日 chico/corrido/torcido, opciones de no avanzar y no animar, 口 con un trazo en dos partes, Kanji de memoria (perfecto y con "No me acuerdo"), diccionario (significado, romaji, kanji, tarjeta, sumar a lista), celular sin desbordes |
 | `tests/practice.test.mjs` | Romaji → kana, corrección tolerante, comparación de trazos (bien, lejos, al revés, puntos, letra chica y corrida, torcido, en dos partes), pronunciación (homófonos, vocales largas, "casi"), palabras desde tarjetas, cuestionarios en la copia |
 | `tests/e2e-practice.mjs` | En Chromium (iPad horizontal y celular): trazos simulados de あ (tick y salto automático), い (mal) y 曜, generar y responder preguntas, "¿qué escuchaste?", pronunciación con dictado del teclado, listening (completar, preguntas y dictado completo) |
+| `tests/notebooks.test.mjs` | Tinta (puntos, presión, contorno), goma (trazos, cintas, stickers; no imágenes), limpieza de trazos importados, cuadernos nuevos y con PDF, sincronización, archivo de cuaderno (versión, imágenes no permitidas, PDF faltante) |
+| `tests/e2e-notebooks.mjs` | En Chromium: crear un cuaderno genkō yōshi, lapicera, resaltador, deshacer/rehacer, goma, cinta, sticker, imagen, página Cornell nueva, todo guardado al recargar, importar y anotar un PDF, celular |
 | `tests/e2e.mjs` | En Chromium a tamaño iPhone (claro) e iPad (oscuro): alta de tarjeta, XSS, repaso con deshacer, Pomodoro y anotación, sesiones, exportar/importar, datos tras recargar, modo sin conexión, sin desbordes horizontales ni errores de consola |
 
 ## Diferencias con la app nativa

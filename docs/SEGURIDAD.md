@@ -58,6 +58,8 @@ Todo archivo importado se trata como potencialmente malicioso (`DeckTransfer`):
 | (Web) Audio/video de un ejercicio de listening | Solo tipos `audio/*` y `video/*`, hasta 60 MB de audio y 90 MB de archivo; se guarda como `Blob` local y se reproduce con un `blob:` URL propio (CSP `media-src 'self' blob:`). Nunca se sube a ningún servidor |
 | (Web) Listas de kanji importadas | Solo se guardan caracteres kanji (sin repetir, máximo 3.000 por lista y 1.000 listas por copia); el nombre se limpia como cualquier texto |
 | (Web) Búsquedas del diccionario | Se resuelven en el dispositivo con datos propios: lo que buscás no sale a ningún servidor. Los enlaces a Takoboto/Jisho solo se abren si los tocás, con `noopener noreferrer` |
+| (Web) Cuadernos importados | Cada trazo se valida: tipo conocido, color `#rrggbb`, grosor y coordenadas acotadas, máximo 4.000 puntos por trazo y 20.000 elementos por página, 2.000 páginas. Imágenes solo `image/png|jpeg|webp|gif`, hasta 8 MB y 500; un trazo que apunta a una imagen inexistente se descarta. Stickers y cintas solo por nombre (dibujos propios de la app). Versión de formato nueva → se rechaza |
+| (Web) PDF | Se abren con pdf.js incluido en la app (sin CDN), con `isEvalSupported: false`; el PDF se dibuja en un `<canvas>` (no se ejecuta su JavaScript ni se abren sus enlaces). Hasta 200 MB; con contraseña se rechaza con aviso. Nunca se sube a ningún servidor |
 | Acceso a archivos fuera del sandbox | Solo archivos que el usuario elige, con `startAccessingSecurityScopedResource` |
 
 ## Plataforma

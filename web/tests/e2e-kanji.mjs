@@ -217,7 +217,7 @@ console.log('iPhone (390×844), oscuro');
   page.on('console', (m) => m.type() === 'error' && problems.push(`console: ${m.text()}`));
   await page.goto(BASE);
   await page.waitForSelector('.deck-row');
-  assert.equal(await page.locator('.nav__item').count(), 6);
+  assert.equal(await page.locator('.nav__item').count(), 7);
   await page.locator('.nav__item[data-tab="dictionary"]').click();
   await page.fill('#dict-q', 'gato');
   await page.waitForSelector('.dict-word >> text=猫', { timeout: 15000 });

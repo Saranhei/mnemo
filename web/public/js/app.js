@@ -16,6 +16,7 @@ import { writingView } from './views/practice/writing.js';
 import { quizzesView, quizView } from './views/practice/quizzes.js';
 import { listeningListView, listeningEditView } from './views/practice/listening.js';
 import { dictionaryView } from './views/dictionary.js';
+import { notebooksView } from './views/notebooks.js';
 
 // "preview": versión de prueba publicada dentro de Claude (sin instalación ni descargas).
 const PREVIEW = document.querySelector('meta[name="mnemo-mode"]')?.content === 'preview';
@@ -23,14 +24,16 @@ const PREVIEW = document.querySelector('meta[name="mnemo-mode"]')?.content === '
 const TABS = [
   { id: 'decks', label: 'Mazos', icon: 'decks', routes: ['decks', 'deck'] },
   { id: 'practice', label: 'Práctica', icon: 'practice', routes: ['practice', 'write', 'quizzes', 'quiz', 'listening', 'listening-edit'] },
-  { id: 'dictionary', label: 'Diccionario', icon: 'book', routes: ['dictionary'] },
-  { id: 'pomodoro', label: 'Pomodoro', icon: 'timer', routes: ['pomodoro'] },
+  { id: 'dictionary', label: 'Diccionario', short: 'Dicc.', icon: 'book', routes: ['dictionary'] },
+  { id: 'notebooks', label: 'Cuadernos', short: 'Notas', icon: 'notebook', routes: ['notebooks'] },
+  { id: 'pomodoro', label: 'Pomodoro', short: 'Foco', icon: 'timer', routes: ['pomodoro'] },
   { id: 'sessions', label: 'Sesiones', icon: 'sessions', routes: ['sessions', 'session'] },
   { id: 'settings', label: 'Ajustes', icon: 'settings', routes: ['settings'] },
 ];
 
 const VIEWS = {
   dictionary: dictionaryView,
+  notebooks: notebooksView,
   decks: decksView,
   deck: deckView,
   practice: practiceView,
@@ -129,7 +132,9 @@ function renderNav() {
           onClick: () => ctx.navigate(tab.id),
         },
         icon(tab.icon),
-        h('span', { class: 'nav__label' }, running ? P.formatClock(P.remaining(s, now, pomo.getDurations())) : tab.label),
+        running
+          ? h('span', { class: 'nav__label' }, P.formatClock(P.remaining(s, now, pomo.getDurations())))
+          : h('span', { class: 'nav__label' }, h('span', { class: 'nav__long' }, tab.label), tab.short ? h('span', { class: 'nav__short', 'aria-hidden': 'true' }, tab.short) : null),
       ),
     );
   }
@@ -142,7 +147,9 @@ function updateNavTimer(now) {
   if (!btn) return;
   btn.classList.toggle('is-running', running);
   btn.dataset.phase = s.phase;
-  btn.querySelector('.nav__label').textContent = running ? P.formatClock(P.remaining(s, now, pomo.getDurations())) : 'Pomodoro';
+  const label = btn.querySelector('.nav__label');
+  if (running) label.textContent = P.formatClock(P.remaining(s, now, pomo.getDurations()));
+  else if (!label.querySelector('.nav__long')) label.replaceChildren(h('span', { class: 'nav__long' }, 'Pomodoro'), h('span', { class: 'nav__short', 'aria-hidden': 'true' }, 'Foco'));
 }
 
 // ───────────────────────────── Reloj global ─────────────────────────────

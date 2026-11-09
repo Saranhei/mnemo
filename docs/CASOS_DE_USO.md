@@ -246,3 +246,26 @@ Para Genki I hay un archivo aparte con una lista por lección (L3–L12) y una c
 4. Tocar un kanji: significado, lecturas, trazos, nivel JLPT aproximado, palabras de ejemplo, **Practicar escritura** y **Agregar a mis kanji**.
 
 **Sin conexión:** la primera vez se descarga (~1,7 MB); después funciona sin internet.
+
+## CU-22 · Tomar notas en un cuaderno
+
+1. Pestaña **Cuadernos → Nuevo cuaderno**: nombre, tipo de hoja (lisa; rayas, cuadrícula o puntos en 3 tamaños; genkō yōshi; rayas con margen; Cornell), color del papel y de la tapa.
+2. Herramientas arriba: **Lapicera** (con presión del Apple Pencil), **Resaltador**, **Goma** (borra el trazo, cinta o sticker que toca), **Cinta** (arrastrar para pegarla), **Stickers** (elegir y tocar la hoja), **Mover** (imágenes y stickers: arrastrar, la esquina azul cambia el tamaño, la cruz roja lo quita) e **Imagen** (foto o archivo).
+3. Colores: 6 por herramienta y uno libre (círculo de colores). Grosor: fino, medio o grueso.
+4. **Deshacer / Rehacer** (también ⌘Z y ⌘⇧Z con teclado), **− / +** para el zoom.
+5. **⋯ (Páginas):** agregar una página después de la actual o al final, con la hoja que quieras; cambiar la hoja de la página actual; borrar la página.
+6. El dedo desplaza la hoja; **Escribir con el dedo** permite dibujar sin Pencil (en iPhone).
+7. Todo se guarda solo, en el dispositivo.
+
+## CU-23 · Escribir sobre un PDF
+
+1. **Cuadernos → Importar PDF** y elegir el archivo (hasta 200 MB; los muy grandes andan más lento en iPhone).
+2. Se crea un cuaderno con una página por página del PDF; se escribe encima con las mismas herramientas de CU-22.
+3. Se pueden agregar páginas en blanco entre las del PDF (⋯ → Agregar página).
+
+## CU-24 · Pasar un cuaderno a otro dispositivo
+
+1. En la lista, **⋯** del cuaderno → **Exportar para otro dispositivo** (compartir o descargar `.mnemo-notebook.json`).
+2. En el otro dispositivo: **Ajustes → Importar** y elegir el archivo.
+3. Si el PDF pesaba más de 40 MB no viaja en el archivo: la app pide elegir el mismo PDF al importar.
+4. Desde **⋯** también se renombra o se borra (con confirmación: se borran páginas, notas, imágenes y el PDF del dispositivo).

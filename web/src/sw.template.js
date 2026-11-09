@@ -14,7 +14,10 @@ const STROKES_CACHE = 'mnemo-strokes-v1';
 // Diccionario: también aparte. Se usa lo guardado y, si hay internet, se actualiza
 // en segundo plano para la próxima vez.
 const DICT_CACHE = 'mnemo-dict-v1';
-const KEEP = new Set([STROKES_CACHE, DICT_CACHE]);
+// Lector de PDF (pdf.js): la carpeta lleva la versión en el nombre, así que un
+// archivo guardado nunca queda viejo. Se guarda la primera vez que se abre un PDF.
+const VENDOR_CACHE = 'mnemo-vendor-v1';
+const KEEP = new Set([STROKES_CACHE, DICT_CACHE, VENDOR_CACHE]);
 
 self.addEventListener('install', (event) => {
   event.waitUntil(
@@ -42,9 +45,10 @@ self.addEventListener('fetch', (event) => {
   const url = new URL(request.url);
   if (url.origin !== self.location.origin) return;
 
-  if (url.pathname.includes('/strokes/') && !url.pathname.endsWith('/030.json')) {
+  const stable = url.pathname.includes('/vendor/') ? VENDOR_CACHE : url.pathname.includes('/strokes/') && !url.pathname.endsWith('/030.json') ? STROKES_CACHE : null;
+  if (stable) {
     event.respondWith(
-      caches.open(STROKES_CACHE).then(async (cache) => {
+      caches.open(stable).then(async (cache) => {
         const cached = await cache.match(request);
         if (cached) return cached;
         const response = await fetch(request);
