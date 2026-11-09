@@ -204,11 +204,12 @@ if (IMG) {
 await shot(page, 'nb-03c-propios');
 
 // Página nueva con otra hoja.
+const pagesBefore = await page.locator('.nb-page').count();
 await page.getByRole('button', { name: 'Páginas', exact: true }).click();
 await page.locator('label.paper-opt', { hasText: 'Cornell' }).click();
 await page.getByRole('button', { name: 'Agregar al final' }).click();
 await page.waitForTimeout(300);
-assert.equal(await page.locator('.nb-page').count(), 2);
+assert.equal(await page.locator('.nb-page').count(), pagesBefore + 1);
 step('página nueva');
 await page.waitForTimeout(800);
 
@@ -219,7 +220,7 @@ await page.getByRole('button', { name: 'Cuadernos' }).first().click();
 await page.getByRole('button', { name: /^Abrir Japonés/ }).click();
 await page.waitForTimeout(800);
 assert.equal(await inkCount(), saved, 'quedó guardado');
-assert.equal(await page.locator('.nb-page').count(), 2);
+assert.equal(await page.locator('.nb-page').count(), pagesBefore + 1);
 step('persiste al recargar');
 // Gesto "atrás" (Android / Safari): cierra el cuaderno.
 await page.goBack();
@@ -239,6 +240,63 @@ if (PDF) {
   step('PDF importado y anotado');
   await shot(page, 'nb-05-pdf');
   await page.getByRole('button', { name: 'Cerrar', exact: true }).click();
+}
+
+// Hoja nueva al llegar al final: en el PDF, rayada; en un cuaderno, con la misma plantilla.
+const toEnd = async () => {
+  await page.locator('.nb-scroller').evaluate((el) => (el.scrollTop = el.scrollHeight));
+  await page.waitForTimeout(300);
+  await page.mouse.move(600, 500);
+  await page.mouse.wheel(0, 300); // seguir "bajando" cuando ya no hay más
+  await page.waitForTimeout(700);
+};
+if (PDF) {
+  await page.getByRole('button', { name: /^Abrir An Integrated/ }).click();
+  await page.waitForTimeout(1300);
+  const n0 = await page.locator('.nb-page').count();
+  await toEnd();
+  assert.equal(await page.locator('.nb-page').count(), n0 + 1, 'al final del PDF se agrega una hoja');
+  assert.ok((await page.locator('.nb-page').last().locator('.nb-page__svg > g:nth-child(2) > line').count()) > 10, 'la hoja nueva es rayada');
+  await toEnd();
+  assert.equal(await page.locator('.nb-page').count(), n0 + 1, 'no se apilan hojas vacías');
+  step('final del PDF: hoja rayada nueva, sin apilar vacías');
+  await page.getByRole('button', { name: 'Cerrar', exact: true }).click();
+}
+await page.getByRole('button', { name: /^Abrir Japonés/ }).click();
+await page.waitForTimeout(1300);
+{
+  const n0 = await page.locator('.nb-page').count();
+  // La última es Cornell: se escribe y se baja hasta el final.
+  await page.locator('.nb-page').last().evaluate((el) => el.scrollIntoView({ block: 'start' }));
+  await page.waitForTimeout(300);
+  await tool('Lapicera');
+  await draw(n0 - 1, [[200, 100], [400, 120]]);
+  assert.equal(await inkCount(n0 - 1), 1);
+  await toEnd();
+  assert.equal(await page.locator('.nb-page').count(), n0 + 1, 'hoja nueva al final');
+  assert.ok(await page.locator('.nb-page').last().locator('text').count(), 'misma plantilla (Cornell, con sus títulos)');
+  step('final del cuaderno: hoja nueva con la misma plantilla');
+}
+await page.getByRole('button', { name: 'Cerrar', exact: true }).click();
+
+// Plantilla desde una imagen.
+if (IMG) {
+  await page.getByRole('button', { name: 'Nuevo cuaderno' }).click();
+  await page.fill('#nb-name', 'Con plantilla');
+  const chooser = page.waitForEvent('filechooser');
+  await page.getByRole('button', { name: 'Desde imagen' }).click();
+  await (await chooser).setFiles(IMG);
+  await page.waitForSelector('.paper-opt__img');
+  await page.getByRole('button', { name: 'Crear cuaderno' }).click();
+  await page.waitForSelector('.nb-page');
+  await page.waitForTimeout(600);
+  assert.ok(await page.locator('.nb-page').first().locator('g > image[href^="blob:"]').count(), 'la hoja usa la imagen');
+  const ratio = await page.locator('.nb-page').first().evaluate((el) => el.clientHeight / el.clientWidth);
+  assert.ok(Math.abs(ratio - 500 / 800) < 0.02, `toma la proporción de la imagen (${ratio})`);
+  await shot(page, 'nb-05b-plantilla-imagen');
+  step('plantilla desde una imagen');
+  await page.getByRole('button', { name: 'Cerrar', exact: true }).click();
+  assert.ok(await page.locator('.nb-cover .nb-thumb').count(), 'tapa con la imagen');
 }
 
 // Celular

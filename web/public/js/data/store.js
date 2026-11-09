@@ -291,9 +291,12 @@ export async function deleteNotebook(id, now = Date.now()) {
   const nb = getNotebook(id);
   if (!nb) return;
   const pageIds = nb.pages.map((p) => p.id);
-  const mediaIds = [];
-  for (const pid of pageIds) for (const item of await getInk(pid)) if (item.m) mediaIds.push(item.m);
-  if (nb.pdfMediaId) mediaIds.push(nb.pdfMediaId);
+  const mediaIds = new Set();
+  for (const pid of pageIds) for (const item of await getInk(pid)) if (item.m) mediaIds.add(item.m);
+  if (nb.pdfMediaId) mediaIds.add(nb.pdfMediaId);
+  // Plantillas hechas con imágenes (pueden repetirse entre páginas).
+  if (nb.bg) mediaIds.add(nb.bg);
+  for (const p of nb.pages) if (p.bg) mediaIds.add(p.bg);
   state.notebooks = state.notebooks.map((n) => (n.id === id ? M.tombstone(n, now) : n));
   commit();
   await deleteInk(pageIds);

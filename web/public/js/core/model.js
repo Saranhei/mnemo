@@ -106,8 +106,13 @@ export function newPage({ paper = null, ratio = 1.414 } = {}) {
   return { id: newId(), pdfPage: null, ratio, ...(PAPERS.includes(paper) ? { paper } : {}) };
 }
 
-export function newNotebook({ name, paper = 'lined-m', paperColor = PAPER_COLORS[0], color = NOTEBOOK_COLORS[0], pdf = null, pages = 1 }, now) {
-  const ratio = pdf?.ratio ?? 1.414;
+/**
+ * @param {object} f
+ * @param {string|null} [f.bg] plantilla hecha con una imagen (id en el almacén de archivos); manda sobre `paper`
+ * @param {number} [f.bgRatio] alto/ancho de esa imagen (las páginas toman esa proporción)
+ */
+export function newNotebook({ name, paper = 'lined-m', paperColor = PAPER_COLORS[0], color = NOTEBOOK_COLORS[0], pdf = null, pages = 1, bg = null, bgRatio = null }, now) {
+  const ratio = pdf?.ratio ?? (bg && bgRatio ? Math.max(0.3, Math.min(4, bgRatio)) : 1.414);
   return {
     id: newId(),
     name,
@@ -116,6 +121,7 @@ export function newNotebook({ name, paper = 'lined-m', paperColor = PAPER_COLORS
     color: NOTEBOOK_COLORS.includes(color) ? color : NOTEBOOK_COLORS[0],
     pdfMediaId: pdf?.mediaId ?? null,
     pdfName: pdf?.name ?? '',
+    ...(bg && !pdf ? { bg } : {}),
     pages: Array.from({ length: pdf ? pdf.pageCount : pages }, (_, i) => ({ id: newId(), pdfPage: pdf ? i + 1 : null, ratio })),
     createdAt: now,
     updatedAt: now,

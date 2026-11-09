@@ -1,5 +1,6 @@
 // Archivo para compartir un cuaderno: { app, type: "notebook", version, notebook, pdf, images }.
-//   notebook = { name, paper, paperColor, color, pages: [{ pdfPage, ratio, paper?, ink: [...] }] }
+//   notebook = { name, paper, paperColor, color, bg?, pages: [{ pdfPage, ratio, paper?, bg?, ink: [...] }] }
+//   (bg = plantilla hecha con una imagen; es un id de `images`)
 //   pdf      = { name, data (base64) } o null (si era muy grande, se pide elegirlo al importar)
 //   images   = { id: { type, data (base64) } }
 // Todo se valida: tipos de archivo, tamaños, cantidades y trazos.
@@ -47,6 +48,7 @@ export function sanitizeNotebookFile(raw) {
     pdfPage: usesPdf && Number.isInteger(p?.pdfPage) && p.pdfPage > 0 && p.pdfPage < 100000 ? p.pdfPage : null,
     ratio: Number.isFinite(p?.ratio) ? Math.max(0.3, Math.min(4, p.ratio)) : 1.414,
     paper: PAPERS.includes(p?.paper) ? p.paper : undefined,
+    bg: typeof p?.bg === 'string' && images[p.bg] ? p.bg : undefined,
     ink: sanitizeStrokes(p?.ink, 20000, (id) => (images[id] ? id : null)),
   }));
   return {
@@ -56,6 +58,7 @@ export function sanitizeNotebookFile(raw) {
       paperColor: PAPER_COLORS.includes(nb.paperColor) ? nb.paperColor : PAPER_COLORS[0],
       color: NOTEBOOK_COLORS.includes(nb.color) ? nb.color : NOTEBOOK_COLORS[0],
       pdfName,
+      bg: typeof nb.bg === 'string' && images[nb.bg] ? nb.bg : null,
       pages,
     },
     pdf,

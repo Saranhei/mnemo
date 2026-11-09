@@ -253,7 +253,8 @@ Para Genki I hay un archivo aparte con una lista por lección (L3–L12) y una c
 2. Herramientas arriba: **Lapicera** (con presión del Apple Pencil), **Resaltador**, **Goma** (borra el trazo, cinta o sticker que toca), **Cinta** (arrastrar para pegarla), **Stickers** (elegir y tocar la hoja), **Mover** (imágenes y stickers: arrastrar, la esquina azul cambia el tamaño, la cruz roja lo quita) e **Imagen** (foto o archivo).
 3. Colores: 6 por herramienta más los propios (ver 7). Grosor: fino, medio o grueso (también en las cintas).
 4. **Deshacer / Rehacer** (también ⌘Z y ⌘⇧Z con teclado), **− / +** para el zoom.
-5. **⋯ (Páginas):** agregar una página después de la actual o al final, con la hoja que quieras; cambiar la hoja de la página actual; borrar la página.
+5. **⋯ (Páginas):** agregar una página después de la actual o al final (por defecto con la misma plantilla que la actual), cambiar la plantilla de la página actual, borrar la página. **Al bajar hasta el final** se agrega sola una hoja con la misma plantilla (si la última ya tiene algo escrito); también está el botón **Agregar página** al final.
+5b. **Plantilla desde una imagen:** en la elección de plantilla (al crear el cuaderno o en ⋯), **Desde imagen** usa una foto o imagen como fondo de la hoja; queda en "Mis plantillas" para otros cuadernos (la **×** la quita de la lista).
 6. Gestos: un dedo desplaza la hoja, pellizcar hace zoom, tocar con dos dedos deshace y con tres rehace. El botón redondo de abajo a la izquierda vuelve a la herramienta anterior (por ejemplo, lapicera ↔ goma). Con Stickers, cada toque con el dedo o el Pencil pega uno. El gesto "atrás" del sistema cierra el cuaderno. **Escribir con el dedo** permite dibujar sin Pencil (en iPhone).
 7. **Colores propios:** el círculo de colores abre una rueda (o se escribe el código, por ejemplo `#12a4b6`); los últimos elegidos quedan a mano.
 8. **Stickers y cintas propios:** en Stickers o Cinta, el botón **+** agrega una imagen a tu colección; la **×** la quita (lo ya pegado queda).
@@ -263,7 +264,7 @@ Para Genki I hay un archivo aparte con una lista por lección (L3–L12) y una c
 
 1. **Cuadernos → Importar PDF** y elegir el archivo (hasta 200 MB; los muy grandes andan más lento en iPhone).
 2. Se crea un cuaderno con una página por página del PDF; se escribe encima con las mismas herramientas de CU-22.
-3. Se pueden agregar páginas en blanco entre las del PDF (⋯ → Agregar página).
+3. Se pueden agregar páginas entre las del PDF (⋯ → Agregar página). Al bajar más allá de la última página del PDF se agrega una hoja rayada para seguir escribiendo.
 
 ## CU-24 · Pasar un cuaderno a otro dispositivo
 

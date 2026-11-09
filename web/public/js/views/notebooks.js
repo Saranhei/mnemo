@@ -13,7 +13,7 @@ import { openSheet, confirmAction, toast } from '../ui/overlays.js';
 import { openLayer } from '../ui/layer.js';
 import * as store from '../data/store.js';
 import { readPref, writePref, getInk, putInk, putMedia, getMedia, deleteMedia, deleteInk } from '../data/storage.js';
-import { live, newId, newPage, PAPERS, PAPER_COLORS, NOTEBOOK_COLORS } from '../core/model.js';
+import { live, newId, PAPERS, PAPER_COLORS, NOTEBOOK_COLORS } from '../core/model.js';
 import { clean, MAX_NAME } from '../core/sanitize.js';
 import { PAGE_W, TOOLS, addPoint, penOutline, centerline, touches, itemBox } from '../core/ink.js';
 import { NOTEBOOK_LIMITS, notebookFileName } from '../core/notebookFile.js';
@@ -56,7 +56,7 @@ export function notebooksView(ctx) {
               h(
                 'button',
                 { class: 'nb-cover', type: 'button', style: { '--nb': nb.color }, onClick: () => openNotebook(ctx, nb.id), 'aria-label': `Abrir ${nb.name}` },
-                h('span', { class: 'nb-cover__paper' }, paperPreview(nb.pdfMediaId ? 'blank' : nb.paper, nb.paperColor)),
+                h('span', { class: 'nb-cover__paper' }, nb.bg && !nb.pdfMediaId ? mediaImg(nb.bg) : paperPreview(nb.pdfMediaId ? 'blank' : nb.paper, nb.paperColor)),
                 nb.pdfMediaId ? h('span', { class: 'nb-cover__badge' }, 'PDF') : null,
               ),
               h(
@@ -71,20 +71,59 @@ export function notebooksView(ctx) {
   );
 }
 
-function paperPicker(name, value, bg, onPick) {
-  return h(
-    'div',
-    { class: 'paper-picker', role: 'radiogroup', 'aria-label': 'Tipo de hoja' },
-    PAPERS.map((p) =>
-      h(
-        'label',
-        { class: 'paper-opt', for: `${name}-${p}` },
-        h('input', { type: 'radio', name, id: `${name}-${p}`, value: p, checked: p === value, onChange: () => onPick(p) }),
-        paperPreview(p, bg),
-        h('span', {}, PAPER_LABEL[p]),
-      ),
-    ),
-  );
+/** Miniatura de una imagen guardada en el dispositivo. */
+function mediaImg(id, cls = 'nb-thumb') {
+  const img = h('img', { class: cls, alt: '', draggable: 'false' });
+  libUrl(id).then((url) => url && (img.src = url));
+  return img;
+}
+
+/**
+ * Elección de plantilla. Valores: un tipo de hoja ('lined-m'…), 'u:<id>' (imagen de
+ * "Mis plantillas") o 'm:<id>' (la imagen que ya usa este cuaderno, en `current`).
+ * Incluye "Desde imagen" para sumar una foto o PDF exportado como imagen.
+ */
+function paperPicker(name, value, bg, onPick, { current = null } = {}) {
+  const host = h('div', { class: 'paper-picker', role: 'radiogroup', 'aria-label': 'Plantilla de la hoja' });
+  const opt_ = (val, preview, label, extra = null) =>
+    h('label', { class: 'paper-opt', for: `${name}-${val}` },
+      h('input', { type: 'radio', name, id: `${name}-${val}`, value: val, checked: val === value, onChange: () => ((value = val), onPick(val)) }),
+      preview, h('span', {}, label), extra);
+  const draw = () => {
+    const own = libList('paper');
+    host.replaceChildren(
+      ...(current ? [opt_(current, mediaImg(current.slice(2), 'paper-opt__img'), 'Como esta')] : []),
+      ...PAPERS.map((p) => opt_(p, paperPreview(p, bg), PAPER_LABEL[p])),
+      ...own.map((x) => opt_(`u:${x.id}`, mediaImg(x.id, 'paper-opt__img'), 'Mi plantilla',
+        h('button', { class: 'nb-own__x', type: 'button', 'aria-label': 'Quitar de mis plantillas', onClick: async (e) => {
+          e.preventDefault();
+          if (!(await removeFromLibrary('paper', x.id))) return;
+          if (value === `u:${x.id}`) {
+            value = PAPERS[0];
+            onPick(value);
+          }
+          draw();
+        } }, '×'))),
+      h('button', { class: 'paper-opt paper-opt--add', type: 'button', onClick: async () => {
+        const id = await addToLibrary('paper');
+        if (!id) return;
+        value = `u:${id}`;
+        onPick(value);
+        draw();
+      } }, h('span', { class: 'paper-opt__plus' }, icon('image', { size: 26 })), h('span', {}, 'Desde imagen')),
+    );
+  };
+  draw();
+  return host;
+}
+
+/** Proporción (alto/ancho) de una plantilla con imagen; null si es una hoja común. */
+async function templateRatio(tpl) {
+  if (tpl.startsWith('u:')) {
+    const x = libList('paper').find((y) => y.id === tpl.slice(2));
+    return x ? 1 / x.a : null;
+  }
+  return null;
 }
 
 function swatches(name, colors, value, onPick, label) {
@@ -107,6 +146,7 @@ function newNotebookSheet(ctx) {
     wide: true,
     build: (close) => {
       let paper = readPref('nb.paper', 'lined-m');
+      if (paper.startsWith('u:') && !libList('paper').some((x) => `u:${x.id}` === paper)) paper = 'lined-m';
       let paperColor = PAPER_COLORS[0];
       let color = NOTEBOOK_COLORS[0];
       const name = h('input', { class: 'input', id: 'nb-name', maxlength: MAX_NAME, placeholder: 'Por ejemplo: Japonés · Clase de los martes', autofocus: true });
@@ -117,16 +157,21 @@ function newNotebookSheet(ctx) {
         'form',
         {
           class: 'stack',
-          onSubmit: (e) => {
+          onSubmit: async (e) => {
             e.preventDefault();
             writePref('nb.paper', paper);
-            const nb = store.createNotebook({ name: clean(name.value, MAX_NAME) || 'Cuaderno', paper, paperColor, color });
+            let fields = { paper };
+            if (paper.startsWith('u:')) {
+              const bg = await copyMedia(paper.slice(2));
+              fields = bg ? { paper: 'blank', bg, bgRatio: await templateRatio(paper) } : { paper: 'lined-m' };
+            }
+            const nb = store.createNotebook({ name: clean(name.value, MAX_NAME) || 'Cuaderno', paperColor, color, ...fields });
             close();
             openNotebook(ctx, nb.id);
           },
         },
         field({ id: 'nb-name', label: 'Nombre', control: name }),
-        h('p', { class: 'field__label' }, 'Hoja'),
+        h('p', { class: 'field__label' }, 'Plantilla'),
         pickerHost,
         h('div', { class: 'row row--wrap' },
           h('div', { class: 'stack stack--tight' }, h('p', { class: 'field__label' }, 'Color del papel'), swatches('nb-pc', PAPER_COLORS, paperColor, (c) => ((paperColor = c), drawPicker()), 'Color del papel')),
@@ -208,6 +253,11 @@ async function exportNotebook(ctx, id) {
   if (!nb) return;
   toast('Preparando el archivo…');
   const images = {};
+  const addImage = async (id) => {
+    if (images[id]) return;
+    const blob = await getMedia(id);
+    if (blob) images[id] = { type: blob.type || 'image/jpeg', data: await toBase64(blob) };
+  };
   const pages = [];
   for (const p of nb.pages) {
     const ink = await getInk(p.id);
@@ -217,15 +267,17 @@ async function exportNotebook(ctx, id) {
         if (blob) images[item.m] = { type: blob.type || 'image/jpeg', data: await toBase64(blob) };
       }
     }
-    pages.push({ pdfPage: p.pdfPage, ratio: p.ratio, paper: p.paper, ink });
+    if (p.bg) await addImage(p.bg);
+    pages.push({ pdfPage: p.pdfPage, ratio: p.ratio, paper: p.paper, bg: p.bg, ink });
   }
+  if (nb.bg) await addImage(nb.bg);
   let pdf = null;
   if (nb.pdfMediaId) {
     const blob = await getMedia(nb.pdfMediaId);
     if (blob && blob.size <= NOTEBOOK_LIMITS.embedPdfBytes) pdf = { name: nb.pdfName, data: await toBase64(blob) };
     else if (blob) toast('El PDF es muy grande para incluirlo: en el otro dispositivo te va a pedir que elijas el mismo PDF.', { ms: 7000 });
   }
-  const file = { app: 'mnemo', type: 'notebook', version: 1, notebook: { name: nb.name, paper: nb.paper, paperColor: nb.paperColor, color: nb.color, pdfName: nb.pdfName, pages }, pdf, images };
+  const file = { app: 'mnemo', type: 'notebook', version: 1, notebook: { name: nb.name, paper: nb.paper, paperColor: nb.paperColor, color: nb.color, pdfName: nb.pdfName, bg: nb.bg ?? null, pages }, pdf, images };
   const result = await deliverFile(notebookFileName(nb.name), JSON.stringify(file), { preview: ctx.preview });
   if (result === 'shared' || result === 'downloaded') toast('Cuaderno exportado. Abrilo en el otro dispositivo con Ajustes → Importar.', { tone: 'ok', ms: 5000 });
 }
@@ -262,12 +314,12 @@ export async function saveImportedNotebook({ notebook, pdf, needsPdf, images }) 
   const nb = store.createNotebook({ name: notebook.name, paper: notebook.paper, paperColor: notebook.paperColor, color: notebook.color });
   const pages = [];
   for (const p of notebook.pages) {
-    const page = { id: newId(), pdfPage: pdfMediaId ? p.pdfPage : null, ratio: p.ratio, ...(p.paper ? { paper: p.paper } : {}) };
+    const page = { id: newId(), pdfPage: pdfMediaId ? p.pdfPage : null, ratio: p.ratio, ...(p.paper ? { paper: p.paper } : {}), ...(p.bg && mediaMap[p.bg] ? { bg: mediaMap[p.bg] } : {}) };
     const ink = p.ink.map((item) => (item.m ? { ...item, m: mediaMap[item.m] } : item)).filter((i) => !('m' in i) || i.m);
     if (ink.length) await putInk(page.id, ink);
     pages.push(page);
   }
-  store.updateNotebook(nb.id, { pages, pdfMediaId, pdfName: pdfMedia?.name ?? '' });
+  store.updateNotebook(nb.id, { pages, pdfMediaId, pdfName: pdfMedia?.name ?? '', ...(notebook.bg && mediaMap[notebook.bg] ? { bg: mediaMap[notebook.bg] } : {}) });
   return nb.id;
 }
 
@@ -276,7 +328,7 @@ export async function saveImportedNotebook({ notebook, pdf, needsPdf, images }) 
 // dispositivo (almacén "media"); la lista, en las preferencias. Al usarlas en una
 // página se guarda una copia aparte, así borrar de la biblioteca no rompe notas.
 
-const LIB = { sticker: 'nb.myStickers', tape: 'nb.myTapes' };
+const LIB = { sticker: 'nb.myStickers', tape: 'nb.myTapes', paper: 'nb.myPapers' };
 const libList = (kind) => {
   const list = readPref(LIB[kind], []);
   return Array.isArray(list) ? list.filter((x) => typeof x?.id === 'string' && Number.isFinite(x.a)) : [];
@@ -290,11 +342,12 @@ async function addToLibrary(kind) {
     return null;
   }
   try {
-    const { blob, width, height } = await shrinkImage(file.file, 600, true);
+    // Las plantillas de hoja necesitan más resolución; los stickers, fondo transparente.
+    const { blob, width, height } = kind === 'paper' ? await shrinkImage(file.file, 2200) : await shrinkImage(file.file, 600, true);
     const id = newId();
     await putMedia(id, blob);
     writePref(LIB[kind], [...libList(kind), { id, a: Math.round((width / height) * 1000) / 1000 }]);
-    toast(kind === 'sticker' ? 'Sticker agregado.' : 'Diseño de cinta agregado.', { tone: 'ok' });
+    toast({ sticker: 'Sticker agregado.', tape: 'Diseño de cinta agregado.', paper: 'Plantilla agregada.' }[kind], { tone: 'ok' });
     return id;
   } catch (err) {
     console.error(err);
@@ -304,7 +357,7 @@ async function addToLibrary(kind) {
 }
 
 async function removeFromLibrary(kind, id) {
-  const ok = await confirmAction({ title: kind === 'sticker' ? '¿Quitar este sticker?' : '¿Quitar este diseño de cinta?', message: 'Se quita de tu colección. Lo que ya pegaste en los cuadernos queda.', confirmLabel: 'Quitar' });
+  const ok = await confirmAction({ title: { sticker: '¿Quitar este sticker?', tape: '¿Quitar este diseño de cinta?', paper: '¿Quitar esta plantilla?' }[kind], message: 'Se quita de tu colección. Lo que ya usaste en los cuadernos queda.', confirmLabel: 'Quitar' });
   if (!ok) return false;
   writePref(LIB[kind], libList(kind).filter((x) => x.id !== id));
   await deleteMedia(id);
@@ -353,6 +406,7 @@ export function openNotebook(ctx, id) {
   let pdfDoc = null;
   let pdfLoading = null;
   let penSeen = false;
+  let checkEnd = () => {};
   // Entrada: Pencil/lápiz escribe; dedos desplazan, pellizcan para zoom y tocan con
   // dos dedos para deshacer (tres para rehacer), como en GoodNotes y Procreate.
   const input = { touches: new Map(), penDown: 0, cancelActive: null };
@@ -440,7 +494,12 @@ export function openNotebook(ctx, id) {
   updateSwap();
   const scroller = h('div', { class: 'nb-scroller' });
   const pagesHost = h('div', { class: 'nb-pages' });
-  scroller.appendChild(pagesHost);
+  // Al llegar al final se agrega una hoja nueva (con la plantilla de la última), si
+  // la última ya tiene algo (notas o una página del PDF): así no se apilan hojas vacías.
+  const endZone = h('div', { class: 'nb-end' },
+    h('button', { class: 'btn btn--ghost', type: 'button', onClick: () => insertPage(nb.pages.length, templateAt(nb.pages.length - 1)) }, icon('plus', { size: 18 }), 'Agregar página'),
+    h('p', { class: 'nb-hint' }, 'Seguí bajando para sumar otra hoja.'));
+  scroller.append(pagesHost, endZone);
   layer.body.append(bar, scroller, swap);
 
   setupGestures();
@@ -640,6 +699,7 @@ export function openNotebook(ctx, id) {
         const dy = p.y - gesture.y;
         scroller.scrollLeft -= dx;
         scroller.scrollTop -= dy;
+        if (dy < 0) checkEnd();
         const dt = Math.max(1, now - gesture.t);
         gesture.vx = gesture.vx * 0.6 + (dx / dt) * 0.4;
         gesture.vy = gesture.vy * 0.6 + (dy / dt) * 0.4;
@@ -815,17 +875,18 @@ export function openNotebook(ctx, id) {
       title: `Página ${idx + 1} de ${nb.pages.length}`,
       wide: true,
       build: (close) => {
-        let paper = nb.pages[idx]?.paper ?? nb.paper;
+        // Por defecto, la misma plantilla que esta página (o la última que no es del PDF).
+        let paper = templateAt(idx);
         const host = h('div', {});
-        host.appendChild(paperPicker('np-paper', paper, nb.paperColor, (p) => (paper = p)));
+        host.appendChild(paperPicker('np-paper', paper, nb.paperColor, (p) => (paper = p), { current: paper.startsWith('m:') ? paper : null }));
         return h('div', { class: 'stack' },
-          h('p', { class: 'field__label' }, 'Hoja para la página nueva'),
+          h('p', { class: 'field__label' }, 'Plantilla para la página nueva'),
           host,
           h('div', { class: 'row row--wrap' },
             h('button', { class: 'btn btn--primary', type: 'button', onClick: () => (close(), insertPage(idx + 1, paper)) }, icon('plus', { size: 18 }), 'Agregar página después de esta'),
             h('button', { class: 'btn btn--ghost', type: 'button', onClick: () => (close(), insertPage(nb.pages.length, paper)) }, 'Agregar al final'),
             nb.pages[idx] && !nb.pages[idx].pdfPage
-              ? h('button', { class: 'btn btn--ghost', type: 'button', onClick: () => (close(), changePaper(idx, paper)) }, 'Usar esta hoja en la página actual')
+              ? h('button', { class: 'btn btn--ghost', type: 'button', onClick: () => (close(), changePaper(idx, paper)) }, 'Usar esta plantilla en la página actual')
               : null,
           ),
           h('button', { class: 'btn btn--ghost btn--danger-text', type: 'button', disabled: nb.pages.length <= 1, onClick: async () => {
@@ -839,21 +900,53 @@ export function openNotebook(ctx, id) {
     });
   }
 
-  function insertPage(at, paper) {
-    const page = newPage({ paper: paper === nb.paper ? null : paper, ratio: 1.414 });
+  /** Plantilla de una página (o de la más cercana hacia atrás que no sea del PDF). */
+  function templateAt(idx) {
+    for (let i = Math.min(idx, nb.pages.length - 1); i >= 0; i--) {
+      const p = nb.pages[i];
+      if (p.pdfPage) continue;
+      if (p.bg) return `m:${p.bg}`;
+      if (p.paper) return p.paper;
+      return nb.bg ? `m:${nb.bg}` : nb.paper;
+    }
+    // Cuaderno de PDF sin páginas propias todavía: hoja rayada.
+    return nb.pdfMediaId ? 'lined-m' : nb.bg ? `m:${nb.bg}` : nb.paper;
+  }
+
+  /** Aplica una plantilla a una página (datos, no dibujo). */
+  async function applyTemplate(page, tpl, { isNew = false } = {}) {
+    let bg = null;
+    if (tpl.startsWith('u:')) {
+      bg = await copyMedia(tpl.slice(2));
+      if (!bg) tpl = 'lined-m';
+      else if (isNew) page.ratio = (await templateRatio(tpl)) ?? page.ratio;
+    } else if (tpl.startsWith('m:')) {
+      bg = tpl.slice(2);
+      if (isNew) page.ratio = nb.pages.find((p) => p.bg === bg)?.ratio ?? (bg === nb.bg ? nb.pages.find((p) => !p.pdfPage && !p.paper)?.ratio : null) ?? page.ratio;
+    }
+    delete page.paper;
+    delete page.bg;
+    if (bg) {
+      if (bg !== nb.bg) page.bg = bg;
+    } else if (tpl !== nb.paper || nb.bg) page.paper = tpl;
+  }
+
+  async function insertPage(at, tpl, { scroll = true } = {}) {
+    const page = { id: newId(), pdfPage: null, ratio: nb.pdfMediaId ? (nb.pages.find((p) => p.pdfPage)?.ratio ?? 1.414) : 1.414 };
+    await applyTemplate(page, tpl, { isNew: true });
     nb.pages.splice(at, 0, page);
     store.updateNotebook(nb.id, { pages: nb.pages });
     const ctl = mountPage(page, at);
     const next = pagesHost.children[at];
     pagesHost.insertBefore(ctl.el, next ?? null);
     renumber();
-    ctl.el.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    if (scroll) ctl.el.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    return ctl;
   }
 
-  function changePaper(idx, paper) {
+  async function changePaper(idx, tpl) {
     const page = nb.pages[idx];
-    if (paper === nb.paper) delete page.paper;
-    else page.paper = paper;
+    await applyTemplate(page, tpl);
     store.updateNotebook(nb.id, { pages: nb.pages });
     pages.get(page.id)?.drawBackground();
   }
@@ -904,6 +997,15 @@ export function openNotebook(ctx, id) {
         el.setAttribute('aria-label', `Página ${n}`);
       },
       drawBackground() {
+        const H = PAGE_W * (page.ratio || 1.414);
+        const bg = page.pdfPage ? null : page.bg ?? (page.paper ? null : nb.bg);
+        if (bg) {
+          // Plantilla hecha con una imagen: llena la hoja (se recorta si no coincide la proporción).
+          const image = svg('image', { x: 0, y: 0, width: PAGE_W, height: H, preserveAspectRatio: 'xMidYMid slice' });
+          paperG.replaceChildren(svg('rect', { width: PAGE_W, height: H, fill: nb.paperColor }), image);
+          mediaUrl(bg).then((url) => url && image.setAttribute('href', url));
+          return;
+        }
         drawPaper(paperG, page.pdfPage ? 'blank' : page.paper ?? nb.paper, H, page.pdfPage ? 'transparent' : nb.paperColor);
       },
       async load() {
@@ -1314,6 +1416,31 @@ export function openNotebook(ctx, id) {
     }
   });
   mo.observe(pagesHost, { childList: true });
+
+  // Al bajar hasta el final (desplazando, con la rueda o "empujando" con el dedo
+  // cuando ya no hay más para bajar) se agrega una hoja.
+  let appending = false;
+  const openedAt = performance.now();
+  checkEnd = async () => {
+    if (appending || performance.now() - openedAt < 1000) return;
+    const er = endZone.getBoundingClientRect();
+    const sr = scroller.getBoundingClientRect();
+    if (er.top > sr.bottom - er.height * 0.5) return;
+    const last = nb.pages.at(-1);
+    const ctl = last && pages.get(last.id);
+    if (!ctl) return;
+    appending = true;
+    try {
+      await ctl.load();
+      if (!last.pdfPage && ctl.items.length === 0) return; // la última está vacía: no se apilan hojas
+      await insertPage(nb.pages.length, templateAt(nb.pages.length - 1), { scroll: false });
+      toast('Nueva hoja agregada.', { ms: 1600 });
+    } finally {
+      appending = false;
+    }
+  };
+  scroller.addEventListener('scroll', () => checkEnd(), { passive: true });
+  scroller.addEventListener('wheel', (e) => e.deltaY > 0 && !e.ctrlKey && checkEnd(), { passive: true });
 }
 
 /** Abre una imagen para dibujarla en un canvas (con respaldo para Safari viejos). */

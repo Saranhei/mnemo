@@ -123,3 +123,13 @@ test('Stickers y cintas propios: se borran con la goma y se validan al importar'
   assert.equal(out[0].u, 1);
   assert.deepEqual([out[1].k, out[1].m, out[1].a], ['img', 'b', 20]);
 });
+
+test('Plantillas con imagen: el cuaderno y sus páginas', () => {
+  const nb = newNotebook({ name: 'Foto', bg: 'img1', bgRatio: 0.625, pages: 2 }, 1);
+  assert.equal(nb.bg, 'img1');
+  assert.deepEqual(nb.pages.map((p) => p.ratio), [0.625, 0.625]);
+  assert.equal(newNotebook({ name: 'PDF', bg: 'x', pdf: { mediaId: 'm', name: 'a.pdf', pageCount: 1, ratio: 1.3 } }, 1).bg, undefined);
+  const r = sanitizeNotebookFile(file({ notebook: { name: 'x', bg: 'i1', pages: [{ ratio: 1, bg: 'i1', ink: [] }, { ratio: 1, bg: 'nada', ink: [] }] } }));
+  assert.equal(r.notebook.bg, 'i1');
+  assert.deepEqual(r.notebook.pages.map((p) => p.bg), ['i1', undefined]);
+});
