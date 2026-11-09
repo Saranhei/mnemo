@@ -496,9 +496,7 @@ export function openNotebook(ctx, id) {
   const pagesHost = h('div', { class: 'nb-pages' });
   // Al llegar al final se agrega una hoja nueva (con la plantilla de la última), si
   // la última ya tiene algo (notas o una página del PDF): así no se apilan hojas vacías.
-  const endZone = h('div', { class: 'nb-end' },
-    h('button', { class: 'btn btn--ghost', type: 'button', onClick: () => insertPage(nb.pages.length, templateAt(nb.pages.length - 1)) }, icon('plus', { size: 18 }), 'Agregar página'),
-    h('p', { class: 'nb-hint' }, 'Seguí bajando para sumar otra hoja.'));
+  const endZone = h('div', { class: 'nb-end', 'aria-hidden': 'true' });
   scroller.append(pagesHost, endZone);
   layer.body.append(bar, scroller, swap);
 
@@ -562,10 +560,8 @@ export function openNotebook(ctx, id) {
       options.append(custom ? h('span', {}) : colorRow(TAPE_COLORS, 'tapeColor'), widthRow('tapeW', 'tape'), libraryRow('tape'));
     } else if (opt.tool === 'sticker') {
       options.append(libraryRow('sticker'));
-    } else if (opt.tool === 'eraser') options.append(h('p', { class: 'nb-hint' }, 'Pasá la goma por un trazo, cinta o sticker para borrarlo.'));
-    else if (opt.tool === 'select') options.append(h('p', { class: 'nb-hint' }, 'Tocá una imagen o sticker para moverlo; la esquina cambia el tamaño.'));
+    }
     options.appendChild(toggle({ id: 'nb-finger', label: 'Escribir con el dedo', checked: opt.finger, onChange: (v) => (savePref('finger', v), applyTouchMode()) }));
-    options.appendChild(h('p', { class: 'nb-hint nb-hint--gestures' }, 'Un dedo: mover la hoja · Pellizcar: zoom · Tocar con 2 dedos: deshacer · con 3: rehacer · Botón redondo de abajo: cambiar a la herramienta anterior'));
   }
 
   function applyTouchMode() {
@@ -1434,7 +1430,6 @@ export function openNotebook(ctx, id) {
       await ctl.load();
       if (!last.pdfPage && ctl.items.length === 0) return; // la última está vacía: no se apilan hojas
       await insertPage(nb.pages.length, templateAt(nb.pages.length - 1), { scroll: false });
-      toast('Nueva hoja agregada.', { ms: 1600 });
     } finally {
       appending = false;
     }
