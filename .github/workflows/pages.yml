@@ -50,3 +50,6 @@ jobs:
     steps:
       - id: deployment
         uses: actions/deploy-pages@v4
+        with:
+          # GitHub a veces tarda más de 10 min en "syncing_files": se le da más margen.
+          timeout: 1800000
