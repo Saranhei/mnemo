@@ -367,6 +367,18 @@ await shot(page, 'nb-08-lista-ipad');
   await fingers([[cx, cy + 200], [cx + 60, cy + 200], [cx + 120, cy + 200]]);
   assert.equal(await ink(), 2, 'tres dedos rehacen (táctil)');
   step('pantalla táctil: 2 dedos deshace, 3 rehace aunque el sistema cancele los punteros');
+  const blocked = await tp.evaluate(([x, y]) => {
+    const target = document.elementFromPoint(x, y);
+    const touch = new Touch({ identifier: 300, target, clientX: x, clientY: y });
+    Object.defineProperty(touch, 'touchType', { value: 'stylus' }); // Chromium no lo tiene; Safari sí
+    const ev = new TouchEvent('touchstart', { touches: [touch], changedTouches: [touch], bubbles: true, cancelable: true });
+    target.dispatchEvent(ev);
+    target.dispatchEvent(new TouchEvent('touchend', { touches: [], changedTouches: [touch], bubbles: true, cancelable: true }));
+    return ev.defaultPrevented;
+  }, [cx, cy]);
+  assert.ok(blocked, 'el Pencil no inicia selección de texto');
+  assert.ok((await tp.locator('.nb-zoom__label').boundingBox()).width <= 1, 'sin número de zoom a la vista');
+  step('el Pencil no selecciona texto; sin número de zoom');
 
   // Botón de cambio rápido: lapicera ↔ goma.
   await tp.getByRole('button', { name: 'Goma', exact: true }).click();

@@ -484,7 +484,8 @@ export function openNotebook(ctx, id) {
   const options = h('div', { class: 'nb-options' });
   const undoBtn = h('button', { class: 'nb-tool', type: 'button', title: 'Deshacer', 'aria-label': 'Deshacer', onClick: () => undo() }, icon('undo', { size: 20 }));
   const redoBtn = h('button', { class: 'nb-tool nb-tool--flip', type: 'button', title: 'Rehacer', 'aria-label': 'Rehacer', onClick: () => redo() }, icon('undo', { size: 20 }));
-  const zoomLabel = h('span', { class: 'nb-zoom__label' });
+  // Sin número de zoom a la vista: solo se anuncia a lectores de pantalla.
+  const zoomLabel = h('span', { class: 'visually-hidden nb-zoom__label', 'aria-live': 'polite' });
   const bar = h('div', { class: 'nb-bar' },
     tools,
     options,
@@ -756,13 +757,17 @@ export function openNotebook(ctx, id) {
     const fingers = (list) => [...list].filter((x) => x.touchType !== 'stylus');
     scroller.addEventListener('touchstart', (e) => {
       const now = fingers(e.touches);
-      if (now.length >= 2) e.preventDefault(); // que el sistema no lo tome como gesto propio
+      // Con el Pencil, Safari puede empezar a seleccionar texto (o mostrar la lupa) y
+      // cortar el trazo: se lo impide. Con varios dedos, que no lo tome como gesto propio.
+      const stylus = [...e.changedTouches].some((x) => x.touchType === 'stylus');
+      if (now.length >= 2 || (stylus && opt.tool !== 'select')) e.preventDefault();
       if (!fingers(e.changedTouches).length || input.penDown) return;
       tt ??= { start: performance.now(), max: 0, moved: 0, pos: new Map() };
       tt.max = Math.max(tt.max, now.length);
       for (const x of fingers(e.changedTouches)) tt.pos.set(x.identifier, [x.clientX, x.clientY]);
     }, { passive: false });
     scroller.addEventListener('touchmove', (e) => {
+      if ([...e.touches].some((x) => x.touchType === 'stylus')) e.preventDefault();
       if (fingers(e.touches).length >= 2) e.preventDefault();
       if (!tt) return;
       for (const x of fingers(e.changedTouches)) {

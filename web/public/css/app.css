@@ -923,7 +923,6 @@ audio.player__media { background: transparent; }
 .nb-tool.is-on { background: var(--fg); color: var(--bg); }
 .nb-tool:disabled { opacity: 0.35; cursor: default; }
 .nb-tool--flip .icon { transform: scaleX(-1); }
-.nb-zoom__label { min-width: 52px; text-align: center; font-size: 13.5px; font-weight: 700; font-variant-numeric: tabular-nums; }
 .nb-color { width: 28px; height: 28px; border-radius: 50%; border: 0; background: var(--sw); box-shadow: inset 0 0 0 1.5px rgb(0 0 0 / 0.2); cursor: pointer; }
 .nb-color.is-on { box-shadow: 0 0 0 2px var(--surface), 0 0 0 4px var(--fg); }
 .nb-width { display: grid; place-items: center; width: 34px; height: 34px; border: 0; border-radius: 10px; background: transparent; cursor: pointer; }
@@ -1003,3 +1002,6 @@ html.is-locked:has(.nb-layer) #toast-root { top: auto; bottom: calc(env(safe-are
 .paper-opt .nb-own__x { top: -4px; right: -4px; }
 .paper-opt--add { padding: 0; border: 0; background: transparent; font: inherit; font-size: 12.5px; font-weight: 700; color: var(--muted); }
 .paper-opt__plus { display: grid; place-items: center; width: 100%; aspect-ratio: 1 / 1.3; border-radius: 6px; border: 2px dashed var(--muted); }
+/* En el cuaderno no se selecciona texto (el Pencil lo activaba y cortaba el trazo). */
+.review:has(.nb-layer), .review:has(.nb-layer) * { -webkit-user-select: none; user-select: none; -webkit-touch-callout: none; }
+.review:has(.nb-layer) input, .review:has(.nb-layer) textarea { -webkit-user-select: text; user-select: text; }

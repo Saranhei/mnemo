@@ -288,6 +288,7 @@ Notas a mano, al estilo GoodNotes: hojas en blanco o sobre un PDF importado.
   | Trackpad: pellizcar o Ctrl + rueda | Zoom |
   | Dedos mientras el Pencil está apoyado | Se ignoran (palma) |
   | Gesto "atrás" (Android, borde en Safari) | Cierra el cuaderno (`ui/layer.js` agrega una entrada al historial por capa; vale para todas las prácticas) |
+  Con el Pencil, Safari podía empezar a seleccionar texto (o mostrar la lupa) y cortar el trazo: se evita con `preventDefault` en `touchstart`/`touchmove` cuando `touchType === 'stylus'` (salvo con la herramienta Mover) y `user-select: none` en todo el editor. El zoom no muestra número (solo se anuncia a lectores de pantalla).
   Si el sistema igual cancela un trazo, lo dibujado hasta ese momento se guarda. Un segundo dedo cancela el trazo con el dedo en curso (era un gesto).
 - **Zoom:** ancho, márgenes y separación de páginas escalan con `--zoom`, y el punto bajo los dedos queda fijo. Los PDF se vuelven a dibujar con la nitidez nueva 250 ms después de soltar.
 - **Sin textos de ayuda en pantalla:** la barra muestra solo herramientas (los gestos están documentados acá y en los casos de uso).
