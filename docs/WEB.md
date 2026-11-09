@@ -280,7 +280,9 @@ Notas a mano, al estilo GoodNotes: hojas en blanco o sobre un PDF importado.
   | Pencil / lápiz (`pointerType: 'pen'`) | Escribe con la herramienta elegida (presión incluida) |
   | Un dedo | Desplaza la hoja, con envión al soltar. Con "Escribir con el dedo", dibuja |
   | Pellizcar con dos dedos | Zoom (50–400 %) alrededor de los dedos; también desplaza |
-  | Tocar con dos dedos / con tres | Deshacer / rehacer (como GoodNotes y Procreate) |
+  | Tocar con dos dedos / con tres | Deshacer / rehacer (como GoodNotes y Procreate). En pantallas táctiles se mide con Touch Events: iOS a veces cancela los punteros en gestos de varios dedos, pero los eventos táctiles llegan completos |
+  | Tocar con un dedo (herramienta Stickers) | Pega el sticker elegido; cada toque, uno más |
+  | Botón redondo abajo a la izquierda | Cambia a la herramienta anterior (lapicera ↔ goma). Reemplaza el doble toque del Apple Pencil, que Safari no informa a las páginas web (en la app nativa sí se podrá, con `UIPencilInteraction`) |
   | Trackpad: pellizcar o Ctrl + rueda | Zoom |
   | Dedos mientras el Pencil está apoyado | Se ignoran (palma) |
   | Gesto "atrás" (Android, borde en Safari) | Cierra el cuaderno (`ui/layer.js` agrega una entrada al historial por capa; vale para todas las prácticas) |

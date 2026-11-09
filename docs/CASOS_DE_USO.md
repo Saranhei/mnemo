@@ -254,7 +254,7 @@ Para Genki I hay un archivo aparte con una lista por lección (L3–L12) y una c
 3. Colores: 6 por herramienta más los propios (ver 7). Grosor: fino, medio o grueso (también en las cintas).
 4. **Deshacer / Rehacer** (también ⌘Z y ⌘⇧Z con teclado), **− / +** para el zoom.
 5. **⋯ (Páginas):** agregar una página después de la actual o al final, con la hoja que quieras; cambiar la hoja de la página actual; borrar la página.
-6. Gestos: un dedo desplaza la hoja, pellizcar hace zoom, tocar con dos dedos deshace y con tres rehace. El gesto "atrás" del sistema cierra el cuaderno. **Escribir con el dedo** permite dibujar sin Pencil (en iPhone).
+6. Gestos: un dedo desplaza la hoja, pellizcar hace zoom, tocar con dos dedos deshace y con tres rehace. El botón redondo de abajo a la izquierda vuelve a la herramienta anterior (por ejemplo, lapicera ↔ goma). Con Stickers, cada toque con el dedo o el Pencil pega uno. El gesto "atrás" del sistema cierra el cuaderno. **Escribir con el dedo** permite dibujar sin Pencil (en iPhone).
 7. **Colores propios:** el círculo de colores abre una rueda (o se escribe el código, por ejemplo `#12a4b6`); los últimos elegidos quedan a mano.
 8. **Stickers y cintas propios:** en Stickers o Cinta, el botón **+** agrega una imagen a tu colección; la **×** la quita (lo ya pegado queda).
 9. Todo se guarda solo, en el dispositivo.

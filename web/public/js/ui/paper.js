@@ -199,6 +199,19 @@ export const STICKERS = {
   },
   bulb: { label: 'Idea', draw: () => [svg('path', { d: 'M50 8a30 30 0 0 0-18 54c4 4 6 8 6 14h24c0-6 2-10 6-14A30 30 0 0 0 50 8z', fill: '#fff3a3', stroke: '#6b5a10', 'stroke-width': 3 }), svg('rect', { x: 38, y: 80, width: 24, height: 12, rx: 3, fill: '#9aa0b4', stroke: '#4a4f60', 'stroke-width': 3 })] },
   pin: { label: 'Importante', draw: () => [svg('circle', { cx: 50, cy: 34, r: 24, fill: '#ff5d73', stroke: '#7a1f33', 'stroke-width': 3 }), svg('path', { d: 'M50 58v36', stroke: '#4a4f60', 'stroke-width': 5, 'stroke-linecap': 'round' }), svg('circle', { cx: 42, cy: 26, r: 6, fill: '#fff', 'fill-opacity': 0.6 })] },
+  onigiri: { label: 'Onigiri', draw: () => [svg('path', { d: 'M50 8C34 8 8 58 10 76c1 10 10 14 40 14s39-4 40-14C92 58 66 8 50 8z', fill: '#ffffff', stroke: '#3a3a44', 'stroke-width': 3, 'stroke-linejoin': 'round' }), svg('rect', { x: 32, y: 60, width: 36, height: 30, rx: 3, fill: '#24323a' }), svg('circle', { cx: 40, cy: 44, r: 3, fill: '#3a3a44' }), svg('circle', { cx: 60, cy: 44, r: 3, fill: '#3a3a44' }), svg('path', { d: 'M45 51q5 4 10 0', fill: 'none', stroke: '#3a3a44', 'stroke-width': 2.5, 'stroke-linecap': 'round' })] },
+  cat: { label: 'Gatito', draw: () => [svg('path', { d: 'M14 30L20 6l20 14h20L80 6l6 24c6 8 8 16 8 26 0 22-20 36-44 36S6 78 6 56c0-10 2-18 8-26z', fill: '#ffd8a8', stroke: '#6b4220', 'stroke-width': 3, 'stroke-linejoin': 'round' }), svg('circle', { cx: 36, cy: 52, r: 5, fill: '#3a2a1a' }), svg('circle', { cx: 64, cy: 52, r: 5, fill: '#3a2a1a' }), svg('path', { d: 'M46 62l4 4 4-4M50 66v4M40 72q10 6 20 0', fill: 'none', stroke: '#3a2a1a', 'stroke-width': 2.5, 'stroke-linecap': 'round', 'stroke-linejoin': 'round' }), svg('circle', { cx: 26, cy: 64, r: 5, fill: '#ff9ec2', 'fill-opacity': 0.7 }), svg('circle', { cx: 74, cy: 64, r: 5, fill: '#ff9ec2', 'fill-opacity': 0.7 })] },
+  sun: { label: 'Sol', draw: () => [svg('path', { d: 'M50 4v12M50 84v12M4 50h12M84 50h12M17 17l9 9M74 74l9 9M83 17l-9 9M26 74l-9 9', stroke: '#ff9f1c', 'stroke-width': 6, 'stroke-linecap': 'round' }), svg('circle', { cx: 50, cy: 50, r: 24, fill: '#ffd23f', stroke: '#8a5a00', 'stroke-width': 3 }), svg('path', { d: 'M40 54q10 8 20 0', fill: 'none', stroke: '#8a5a00', 'stroke-width': 3, 'stroke-linecap': 'round' })] },
+  music: { label: 'Música', draw: () => [svg('path', { d: 'M38 74V20l46-10v52', fill: 'none', stroke: '#7b4dd8', 'stroke-width': 7, 'stroke-linejoin': 'round' }), svg('ellipse', { cx: 28, cy: 76, rx: 14, ry: 11, fill: '#7b4dd8' }), svg('ellipse', { cx: 74, cy: 64, rx: 14, ry: 11, fill: '#7b4dd8' })] },
+  sparkle: { label: 'Brillo', draw: () => [svg('path', { d: 'M42 8q4 30 34 34-30 4-34 34-4-30-34-34 30-4 34-34z', fill: '#c7a6ff', stroke: '#4a2a8a', 'stroke-width': 3, 'stroke-linejoin': 'round' }), svg('path', { d: 'M78 60q2 12 14 14-12 2-14 14-2-12-14-14 12-2 14-14z', fill: '#ffd23f', stroke: '#8a5a00', 'stroke-width': 2.5, 'stroke-linejoin': 'round' })] },
+  hundred: {
+    label: '100 puntos',
+    draw: () => {
+      const t = svg('text', { x: 50, y: 62, 'text-anchor': 'middle', 'font-size': 36, 'font-weight': 900, fill: '#d0302f', 'font-family': 'system-ui, sans-serif', transform: 'rotate(-8 50 50)' });
+      t.textContent = '100';
+      return [svg('path', { d: 'M12 76q30 10 76-2', fill: 'none', stroke: '#d0302f', 'stroke-width': 4, 'stroke-linecap': 'round' }), svg('path', { d: 'M16 84q30 9 70-2', fill: 'none', stroke: '#d0302f', 'stroke-width': 4, 'stroke-linecap': 'round' }), t];
+    },
+  },
   arrow: { label: 'Flecha', draw: () => [svg('path', { d: 'M8 42h56V22l28 28-28 28V58H8z', fill: '#4cc9f0', stroke: '#145a70', 'stroke-width': 3, 'stroke-linejoin': 'round' })] },
   question: {
     label: 'Duda',

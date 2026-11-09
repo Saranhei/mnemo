@@ -251,9 +251,82 @@ await shot(page, 'nb-07-celular-lista');
 // Las tapas no se pisan (nombre largo).
 await page.setViewportSize({ width: 1180, height: 820 });
 const covers = await page.locator('.nb-cover').evaluateAll((els) => els.map((e) => { const r = e.getBoundingClientRect(); const t = e.closest('li').getBoundingClientRect(); return [r.right <= t.right + 1 && r.width > 50, r.left, r.right, t.left, t.right]; }));
-console.log(covers);
 assert.ok(covers.every((c) => c[0]), 'las tapas entran en su lugar');
 await shot(page, 'nb-08-lista-ipad');
+
+// ─── Pantalla táctil (como iPad/Android): toques medidos con eventos táctiles ───
+{
+  const tctx = await browser.newContext({ viewport: { width: 1180, height: 820 }, hasTouch: true });
+  const tp = await tctx.newPage();
+  tp.on('pageerror', (e) => errors.push(e.message));
+  await tp.goto(BASE);
+  await tp.getByRole('button', { name: 'Cuadernos' }).first().click();
+  await tp.getByRole('button', { name: 'Nuevo cuaderno' }).click();
+  await tp.getByRole('button', { name: 'Crear cuaderno' }).click();
+  await tp.waitForSelector('.nb-page');
+  await tp.waitForTimeout(500);
+  const ink = () => tp.locator('.nb-page').first().locator('.nb-page__svg > g:nth-child(4) > *').count();
+  const box = await tp.locator('.nb-page__svg').first().boundingBox();
+  const pen = async (x, y) => tp.evaluate(([x, y]) => {
+    const fire = (type, cx, cy) => document.elementFromPoint(x, y).dispatchEvent(new PointerEvent(type, { pointerId: 5, pointerType: 'pen', clientX: cx, clientY: cy, pressure: 0.6, bubbles: true, cancelable: true, buttons: 1 }));
+    fire('pointerdown', x, y);
+    for (let i = 1; i < 8; i++) fire('pointermove', x + i * 10, y + i * 3);
+    fire('pointerup', x + 80, y + 24);
+  }, [x, y]);
+  // Toque con N dedos: Pointer Events + Touch Events, como manda Safari.
+  const fingers = (pts) => tp.evaluate((pts) => {
+    const target = document.elementFromPoint(pts[0][0], pts[0][1]);
+    const touches = pts.map(([x, y], i) => new Touch({ identifier: 100 + i, target, clientX: x, clientY: y }));
+    pts.forEach(([x, y], i) => {
+      target.dispatchEvent(new PointerEvent('pointerdown', { pointerId: 100 + i, pointerType: 'touch', clientX: x, clientY: y, bubbles: true, cancelable: true, buttons: 1 }));
+      target.dispatchEvent(new TouchEvent('touchstart', { touches: touches.slice(0, i + 1), changedTouches: [touches[i]], bubbles: true, cancelable: true }));
+    });
+    pts.forEach(([x, y], i) => {
+      // iOS a veces cancela los punteros en gestos de varios dedos: el toque igual cuenta.
+      target.dispatchEvent(new PointerEvent('pointercancel', { pointerId: 100 + i, pointerType: 'touch', clientX: x, clientY: y, bubbles: true }));
+      target.dispatchEvent(new TouchEvent('touchend', { touches: touches.slice(i + 1), changedTouches: [touches[i]], bubbles: true, cancelable: true }));
+    });
+  }, pts);
+  const cx = box.x + box.width * 0.3;
+  const cy = box.y + box.width * 0.3;
+  await pen(cx, cy);
+  await pen(cx, cy + 60);
+  assert.equal(await ink(), 2);
+  await fingers([[cx, cy + 200], [cx + 90, cy + 200]]);
+  assert.equal(await ink(), 1, 'tocar con dos dedos deshace (táctil)');
+  await fingers([[cx, cy + 200], [cx + 60, cy + 200], [cx + 120, cy + 200]]);
+  assert.equal(await ink(), 2, 'tres dedos rehacen (táctil)');
+  step('pantalla táctil: 2 dedos deshace, 3 rehace aunque el sistema cancele los punteros');
+
+  // Botón de cambio rápido: lapicera ↔ goma.
+  await tp.getByRole('button', { name: 'Goma', exact: true }).click();
+  await tp.getByRole('button', { name: 'Cambiar a Lapicera' }).click();
+  assert.equal(await tp.locator('.nb-tool.is-on').getAttribute('aria-label'), 'Lapicera');
+  await tp.getByRole('button', { name: 'Cambiar a Goma' }).click();
+  assert.equal(await tp.locator('.nb-tool.is-on').getAttribute('aria-label'), 'Goma');
+  step('botón de cambio rápido lapicera ↔ goma');
+
+  // Stickers con el dedo: cada toque pega uno más.
+  await tp.getByRole('button', { name: 'Stickers', exact: true }).click();
+  await tp.getByRole('button', { name: 'Gatito' }).click();
+  await fingers([[cx + 300, cy + 100]]);
+  await fingers([[cx + 300, cy + 260]]);
+  await tp.waitForTimeout(200);
+  assert.equal(await ink(), 4, 'dos stickers con el dedo');
+  step('stickers con toques del dedo');
+
+  // Mover: borrar un sticker no deja el recuadro.
+  await tp.getByRole('button', { name: 'Mover y cambiar tamaño' }).click();
+  const st = await tp.locator('.nb-page').first().locator('.nb-page__svg > g:nth-child(4) > g').last().boundingBox();
+  await tp.mouse.click(st.x + st.width / 2, st.y + st.height / 2);
+  assert.ok(await tp.locator('.nb-page').first().locator('.nb-page__svg > g:nth-child(6) > *').count(), 'recuadro visible');
+  await tp.keyboard.press('Delete');
+  assert.equal(await ink(), 3);
+  assert.equal(await tp.locator('.nb-page').first().locator('.nb-page__svg > g:nth-child(6) > *').count(), 0, 'sin recuadro vacío');
+  step('borrar un sticker quita el recuadro');
+  await tp.screenshot({ path: join(OUT, 'nb-09-tactil.png') });
+  await tctx.close();
+}
 
 await browser.close();
 if (errors.length) {

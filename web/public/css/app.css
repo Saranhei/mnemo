@@ -986,3 +986,10 @@ audio.player__media { background: transparent; }
 }
 /* En un cuaderno, los avisos van abajo para no tapar las herramientas. */
 html.is-locked:has(.nb-layer) #toast-root { top: auto; bottom: calc(env(safe-area-inset-bottom, 0px) + 20px); }
+.layer .review__body.nb-layer { position: relative; }
+.nb-swap {
+  position: absolute; left: max(16px, env(safe-area-inset-left, 0px)); bottom: calc(env(safe-area-inset-bottom, 0px) + 18px); z-index: 2;
+  display: grid; place-items: center; width: 56px; height: 56px; border: 0; border-radius: 50%;
+  background: var(--fg); color: var(--bg); box-shadow: var(--shadow); cursor: pointer;
+}
+.nb-swap::after { content: ''; position: absolute; inset: -4px; border-radius: 50%; border: 2px solid var(--fg); opacity: 0.25; }

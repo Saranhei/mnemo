@@ -425,10 +425,23 @@ export function openNotebook(ctx, id) {
       h('button', { class: 'nb-tool', type: 'button', title: 'Páginas', 'aria-label': 'Páginas', onClick: pageMenu }, icon('more', { size: 22 })),
     ),
   );
+  // Cambio rápido entre las dos últimas herramientas (por ejemplo, lapicera ↔ goma).
+  // Safari no le avisa a las páginas web el doble toque del Apple Pencil, así que
+  // este botón, a mano del pulgar, cumple esa función.
+  const TOOL_INFO = { pen: ['pen', 'Lapicera'], hl: ['highlighter', 'Resaltador'], eraser: ['eraser', 'Goma'], tape: ['tape', 'Cinta'], sticker: ['sticker', 'Stickers'], select: ['hand', 'Mover'] };
+  opt.prevTool = readPref('nb.prevTool', opt.tool === 'eraser' ? 'pen' : 'eraser');
+  const swap = h('button', { class: 'nb-swap', type: 'button', onClick: () => setTool(TOOL_INFO[opt.prevTool] ? opt.prevTool : 'pen') });
+  function updateSwap() {
+    const [ic, label] = TOOL_INFO[opt.prevTool] ?? TOOL_INFO.pen;
+    swap.replaceChildren(icon(ic, { size: 24 }));
+    swap.setAttribute('aria-label', `Cambiar a ${label}`);
+    swap.title = `Cambiar a ${label}`;
+  }
+  updateSwap();
   const scroller = h('div', { class: 'nb-scroller' });
   const pagesHost = h('div', { class: 'nb-pages' });
   scroller.appendChild(pagesHost);
-  layer.body.append(bar, scroller);
+  layer.body.append(bar, scroller, swap);
 
   setupGestures();
 
@@ -438,7 +451,9 @@ export function openNotebook(ctx, id) {
   }
 
   function setTool(t) {
+    if (t !== opt.tool) savePref('prevTool', opt.tool);
     savePref('tool', t);
+    updateSwap();
     for (const b of tools.querySelectorAll('[data-tool]')) {
       b.classList.toggle('is-on', b.dataset.tool === t);
       b.setAttribute('aria-pressed', String(b.dataset.tool === t));
@@ -491,7 +506,7 @@ export function openNotebook(ctx, id) {
     } else if (opt.tool === 'eraser') options.append(h('p', { class: 'nb-hint' }, 'Pasá la goma por un trazo, cinta o sticker para borrarlo.'));
     else if (opt.tool === 'select') options.append(h('p', { class: 'nb-hint' }, 'Tocá una imagen o sticker para moverlo; la esquina cambia el tamaño.'));
     options.appendChild(toggle({ id: 'nb-finger', label: 'Escribir con el dedo', checked: opt.finger, onChange: (v) => (savePref('finger', v), applyTouchMode()) }));
-    options.appendChild(h('p', { class: 'nb-hint nb-hint--gestures' }, 'Un dedo: mover la hoja · Pellizcar: zoom · Tocar con 2 dedos: deshacer · con 3: rehacer'));
+    options.appendChild(h('p', { class: 'nb-hint nb-hint--gestures' }, 'Un dedo: mover la hoja · Pellizcar: zoom · Tocar con 2 dedos: deshacer · con 3: rehacer · Botón redondo de abajo: cambiar a la herramienta anterior'));
   }
 
   function applyTouchMode() {
@@ -643,11 +658,8 @@ export function openNotebook(ctx, id) {
       }
       if (!t.delete(e.pointerId)) return;
       if (t.size === 0) {
-        // Toque rápido con dos dedos = deshacer; con tres = rehacer.
-        if (tap && e.type === 'pointerup' && !palm && performance.now() - tap.start < 320 && tap.moved < 14) {
-          if (tap.max === 2) undo();
-          else if (tap.max >= 3) redo();
-        }
+        // Sin eventos táctiles (algunos navegadores de escritorio): toques con Pointer Events.
+        if (!HAS_TOUCH && tap && !palm) handleTap(tap.max, performance.now() - tap.start, tap.moved, e.clientX, e.clientY);
         if (gesture?.kind === 'pan' && performance.now() - gesture.t < 60) glide(gesture.vx * 16, gesture.vy * 16);
         gesture = null;
         tap = null;
@@ -656,6 +668,49 @@ export function openNotebook(ctx, id) {
     };
     scroller.addEventListener('pointerup', up);
     scroller.addEventListener('pointercancel', up);
+
+    // Toques rápidos: con dos dedos deshace, con tres rehace, con uno pega el sticker
+    // elegido. En iPhone/iPad y Android se miden con los eventos táctiles, que el
+    // sistema entrega completos aunque cancele los de puntero en gestos de varios dedos.
+    const HAS_TOUCH = 'ontouchstart' in globalThis;
+    let tt = null;
+    const fingers = (list) => [...list].filter((x) => x.touchType !== 'stylus');
+    scroller.addEventListener('touchstart', (e) => {
+      const now = fingers(e.touches);
+      if (now.length >= 2) e.preventDefault(); // que el sistema no lo tome como gesto propio
+      if (!fingers(e.changedTouches).length || input.penDown) return;
+      tt ??= { start: performance.now(), max: 0, moved: 0, pos: new Map() };
+      tt.max = Math.max(tt.max, now.length);
+      for (const x of fingers(e.changedTouches)) tt.pos.set(x.identifier, [x.clientX, x.clientY]);
+    }, { passive: false });
+    scroller.addEventListener('touchmove', (e) => {
+      if (fingers(e.touches).length >= 2) e.preventDefault();
+      if (!tt) return;
+      for (const x of fingers(e.changedTouches)) {
+        const p0 = tt.pos.get(x.identifier);
+        if (p0) tt.moved = Math.max(tt.moved, Math.hypot(x.clientX - p0[0], x.clientY - p0[1]));
+      }
+    }, { passive: false });
+    const touchEnd = (e) => {
+      if (!tt || fingers(e.touches).length) return;
+      const last = fingers(e.changedTouches)[0];
+      const d = tt;
+      tt = null;
+      if (input.penDown || !last) return;
+      handleTap(d.max, performance.now() - d.start, d.moved, last.clientX, last.clientY);
+    };
+    scroller.addEventListener('touchend', touchEnd);
+    scroller.addEventListener('touchcancel', touchEnd);
+
+    function handleTap(count, ms, moved, x, y) {
+      if (ms > 450 || moved > 24) return;
+      if (count === 2) undo();
+      else if (count >= 3) redo();
+      else if (count === 1 && opt.tool === 'sticker' && !(opt.finger && !penSeen)) {
+        const el = document.elementFromPoint(x, y)?.closest('.nb-page');
+        pages.get(el?.dataset.id)?.placeStickerAt(x, y);
+      }
+    }
 
     // Envión al soltar (como el desplazamiento del sistema).
     function glide(vx, vy) {
@@ -722,6 +777,7 @@ export function openNotebook(ctx, id) {
     const before = page.items.slice();
     page.items.splice(index, 1);
     selected = null;
+    page.drawSelection(null);
     page.redraw();
     page.save();
     record(page, before);
@@ -1016,14 +1072,24 @@ export function openNotebook(ctx, id) {
         input.cancelActive = cancelDrawing;
         paintTape();
       } else if (opt.tool === 'sticker') {
-        const own = opt.sticker.startsWith('u:') ? libList('sticker').find((x) => `u:${x.id}` === opt.sticker) : null;
-        if (own) return placeOwnSticker(own, pt, before);
-        ctl.items.push({ t: 'st', k: STICKERS[opt.sticker] ? opt.sticker : 'star', x: Math.round(pt.x), y: Math.round(pt.y), s: 110, r: 0 });
-        ctl.redraw();
-        ctl.save();
-        record(ctl, before);
+        placeSticker(pt, before);
       }
     });
+
+    function placeSticker(pt, before = ctl.items.slice()) {
+      const own = opt.sticker.startsWith('u:') ? libList('sticker').find((x) => `u:${x.id}` === opt.sticker) : null;
+      if (own) return placeOwnSticker(own, pt, before);
+      ctl.items.push({ t: 'st', k: STICKERS[opt.sticker] ? opt.sticker : 'star', x: Math.round(pt.x), y: Math.round(pt.y), s: 110, r: 0 });
+      ctl.redraw();
+      ctl.save();
+      record(ctl, before);
+    }
+    /** Pegar con un toque del dedo (el dedo no dibuja: se detecta el toque aparte). */
+    ctl.placeStickerAt = async (x, y) => {
+      await ctl.load();
+      const pt = toPage({ clientX: x, clientY: y, pointerType: 'touch' });
+      if (pt) placeSticker(pt);
+    };
 
     /** Un sticker propio es una imagen chica que se borra con la goma. */
     async function placeOwnSticker(own, pt, before) {
@@ -1250,16 +1316,33 @@ export function openNotebook(ctx, id) {
   mo.observe(pagesHost, { childList: true });
 }
 
+/** Abre una imagen para dibujarla en un canvas (con respaldo para Safari viejos). */
+async function decodeImage(file) {
+  try {
+    return await createImageBitmap(file);
+  } catch {
+    const url = URL.createObjectURL(file);
+    try {
+      const img = new Image();
+      img.src = url;
+      await img.decode();
+      return { width: img.naturalWidth, height: img.naturalHeight, img, close: () => {} };
+    } finally {
+      setTimeout(() => URL.revokeObjectURL(url), 1000);
+    }
+  }
+}
+
 /** Achica una imagen (las fotos del celular pesan mucho). `keepAlpha`: siempre PNG, para stickers con fondo transparente. */
 async function shrinkImage(file, max = 1600, keepAlpha = false) {
-  const bitmap = await createImageBitmap(file);
+  const bitmap = await decodeImage(file);
   const scale = Math.min(1, max / Math.max(bitmap.width, bitmap.height));
   const w = Math.round(bitmap.width * scale);
   const hh = Math.round(bitmap.height * scale);
   const canvas = document.createElement('canvas');
   canvas.width = w;
   canvas.height = hh;
-  canvas.getContext('2d').drawImage(bitmap, 0, 0, w, hh);
+  canvas.getContext('2d').drawImage(bitmap.img ?? bitmap, 0, 0, w, hh);
   bitmap.close?.();
   const type = keepAlpha || /png|webp|gif/.test(file.type) ? 'image/png' : 'image/jpeg';
   const blob = await new Promise((resolve) => canvas.toBlob(resolve, type, 0.86));
