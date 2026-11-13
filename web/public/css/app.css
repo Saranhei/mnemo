@@ -1047,3 +1047,7 @@ html.is-locked:has(.nb-layer) #toast-root { top: auto; bottom: calc(env(safe-are
 }
 .nb-flag[hidden] { display: none; }
 @media (min-width: 700px) { .nb-layer:has(.nb-side:not([hidden])) .nb-swap { left: 266px; } }
+.nb-goto { display: flex; align-items: center; gap: 8px; padding: 0 12px 10px; }
+.nb-goto__label { font-size: 13.5px; font-weight: 700; color: var(--muted); white-space: nowrap; }
+.nb-goto__input { width: 0; flex: 1; min-height: 38px; padding: 6px 10px; font-variant-numeric: tabular-nums; -webkit-user-select: text; user-select: text; }
+.nb-goto__btn { min-height: 38px; padding: 0 14px; }

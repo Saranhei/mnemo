@@ -407,6 +407,7 @@ export function openNotebook(ctx, id) {
   let pdfLoading = null;
   let penSeen = false;
   let checkEnd = () => {};
+  let stopGlide = () => {};
   // "Tirar" hacia arriba estando al final: agrega una hoja aunque la última esté vacía.
   let pull = 0;
   const atBottom = () => scroller.scrollTop + scroller.clientHeight >= scroller.scrollHeight - 2;
@@ -534,14 +535,39 @@ export function openNotebook(ctx, id) {
     drawSide();
   } }, icon('bookmark', { size: 15 }), 'Marcadas');
   const sideList = h('ol', { class: 'nb-side__list' });
-  side.append(h('div', { class: 'nb-side__head' }, sideTitle, sideFilter), sideList);
-  const pill = h('button', { class: 'nb-pill', type: 'button', 'aria-label': 'Ver páginas', onClick: () => toggleSide() });
+  // Ir a una página por número (la numeración del cuaderno, la misma de la pastilla).
+  const goInput = h('input', { class: 'input nb-goto__input', id: 'nb-goto', type: 'number', inputmode: 'numeric', min: 1, placeholder: 'N.º', 'aria-label': 'Número de página', enterkeyhint: 'go' });
+  const goForm = h('form', { class: 'nb-goto', onSubmit: (e) => {
+    e.preventDefault();
+    const n = Math.round(Number(goInput.value));
+    if (!Number.isFinite(n) || n < 1) return;
+    const target = nb.pages[Math.min(n, nb.pages.length) - 1];
+    if (n > nb.pages.length) toast(`El cuaderno tiene ${nb.pages.length} páginas: te llevo a la última.`);
+    goInput.value = '';
+    goInput.blur();
+    goToPage(target.id);
+  } }, h('label', { class: 'nb-goto__label', for: 'nb-goto' }, 'Ir a la página'), goInput, h('button', { class: 'btn btn--primary nb-goto__btn', type: 'submit' }, 'Ir'));
+  side.append(h('div', { class: 'nb-side__head' }, sideTitle, sideFilter), goForm, sideList);
+  const pill = h('button', { class: 'nb-pill', type: 'button', 'aria-label': 'Ver páginas e ir a una página', onClick: () => {
+    if (side.hidden) toggleSide(true);
+    goInput.focus();
+  } });
   const main = h('div', { class: 'nb-main' }, side, scroller);
 
   function toggleSide(open = side.hidden) {
+    // Al abrir o cerrar el panel cambia el ancho de las hojas: se mantiene a la vista
+    // el mismo lugar de la página actual.
+    const cur = pages.get(currentPageId)?.el;
+    const sr0 = scroller.getBoundingClientRect();
+    const r0 = cur?.getBoundingClientRect();
+    const frac = r0 ? (sr0.top - r0.top) / r0.height : 0;
     side.hidden = !open;
     writePref('nb.side', open);
-    requestAnimationFrame(fitBase);
+    fitBase();
+    if (cur) {
+      const r1 = cur.getBoundingClientRect();
+      scroller.scrollTop += r1.top + frac * r1.height - scroller.getBoundingClientRect().top;
+    }
     if (open) {
       drawSide();
       sideList.querySelector('.is-current')?.scrollIntoView({ block: 'center' });
@@ -572,9 +598,11 @@ export function openNotebook(ctx, id) {
   function goToPage(id) {
     const ctl = pages.get(id);
     if (!ctl) return;
+    stopGlide(); // si la hoja venía deslizándose, que no se pase de largo
     ctl.el.scrollIntoView({ block: 'start' });
     currentPageId = id;
     updatePageInfo();
+    sideList.querySelector('.is-current')?.scrollIntoView({ block: 'nearest' });
     if (matchMedia('(max-width: 699px)').matches) toggleSide(false);
   }
 
@@ -782,6 +810,7 @@ export function openNotebook(ctx, id) {
     let palm = false; // el Pencil apoyó mientras había dedos: se ignoran hasta levantarlos
     let inertia = 0;
     const stopInertia = () => cancelAnimationFrame(inertia);
+    stopGlide = stopInertia;
     const pts = () => [...t.values()];
     const startGesture = () => {
       const p = pts();

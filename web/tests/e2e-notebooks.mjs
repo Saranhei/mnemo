@@ -272,6 +272,20 @@ if (PDF) {
   await page.waitForTimeout(600);
   assert.equal(await page.locator('.nb-page').count(), n0 + 2, 'tirar al final agrega una hoja');
   step('tirar con el dedo al final agrega otra hoja');
+  // Ir a una página por número.
+  await page.getByRole('button', { name: /^Ver páginas/ }).click();
+  await page.fill('#nb-goto', '3');
+  await page.keyboard.press('Enter');
+  await page.waitForTimeout(500);
+  assert.match(await page.locator('.nb-pill').textContent(), /^3 \//, 'fue a la página 3');
+  const top = await page.locator('.nb-page').nth(2).evaluate((el) => Math.round(el.getBoundingClientRect().top - el.closest('.nb-scroller').getBoundingClientRect().top));
+  assert.ok(Math.abs(top) < 40, `la página 3 queda arriba (${top})`);
+  await page.fill('#nb-goto', '999');
+  await page.getByRole('button', { name: 'Ir', exact: true }).click();
+  await page.waitForTimeout(500);
+  assert.match(await page.locator('.nb-pill').textContent(), /^(\d+) \/ \1$/, 'un número de más lleva a la última');
+  await page.getByRole('button', { name: 'Páginas y marcadores' }).click();
+  step('ir a la página N');
   await page.getByRole('button', { name: 'Cerrar', exact: true }).click();
 }
 await page.getByRole('button', { name: /^Abrir Japonés/ }).click();
