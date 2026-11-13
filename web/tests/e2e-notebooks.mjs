@@ -205,7 +205,7 @@ await shot(page, 'nb-03c-propios');
 
 // Página nueva con otra hoja.
 const pagesBefore = await page.locator('.nb-page').count();
-await page.getByRole('button', { name: 'Páginas', exact: true }).click();
+await page.getByRole('button', { name: 'Opciones de la página' }).click();
 await page.locator('label.paper-opt', { hasText: 'Cornell' }).click();
 await page.getByRole('button', { name: 'Agregar al final' }).click();
 await page.waitForTimeout(300);
@@ -406,6 +406,49 @@ await shot(page, 'nb-08-lista-ipad');
   assert.equal(await ink(), 3);
   assert.equal(await tp.locator('.nb-page').first().locator('.nb-page__svg > g:nth-child(6) > *').count(), 0, 'sin recuadro vacío');
   step('borrar un sticker quita el recuadro');
+
+  // Post-it: se pega, se agranda con la manito y se escribe encima.
+  await tp.getByRole('button', { name: 'Stickers', exact: true }).click();
+  await tp.getByRole('button', { name: 'Post-it' }).first().click();
+  const n1 = await ink();
+  await fingers([[cx + 420, cy + 120]]);
+  await tp.waitForTimeout(200);
+  assert.equal(await ink(), n1 + 1, 'post-it pegado');
+  await tp.getByRole('button', { name: 'Mover y cambiar tamaño' }).click();
+  const note = await tp.locator('.nb-note').last().boundingBox();
+  await tp.mouse.click(note.x + note.width / 2, note.y + note.height / 2);
+  const handle = await tp.locator('.nb-handle').boundingBox();
+  await tp.mouse.move(handle.x + handle.width / 2, handle.y + handle.height / 2);
+  await tp.mouse.down();
+  await tp.mouse.move(handle.x + 120, handle.y + 40, { steps: 6 });
+  await tp.mouse.up();
+  const note2 = await tp.locator('.nb-note').last().boundingBox();
+  assert.ok(note2.width > note.width + 60 && note2.height > note.height + 10, 'post-it agrandado (ancho y alto libres)');
+  step('post-it: pegar y cambiar el tamaño');
+
+  // Panel de páginas con número y banderitas.
+  await tp.getByRole('button', { name: 'Páginas y marcadores' }).click();
+  assert.ok(await tp.locator('.nb-side').isVisible());
+  assert.match(await tp.locator('.nb-side__title').textContent(), /^Página 1 de \d+$/);
+  assert.match(await tp.locator('.nb-pill').textContent(), /^1 \/ \d+$/);
+  await tp.getByRole('button', { name: 'Marcar la página 1' }).click();
+  await tp.fill('#nb-mark-title', 'Lección 3 · verbos');
+  await tp.getByRole('button', { name: 'Guardar' }).click();
+  await tp.waitForTimeout(300);
+  assert.equal((await tp.locator('.nb-flag').first().textContent()).trim(), 'Lección 3 · verbos');
+  assert.equal(await tp.locator('.nb-side__mark').first().textContent(), 'Lección 3 · verbos');
+  await tp.getByRole('button', { name: 'Marcadas' }).click();
+  assert.equal(await tp.locator('.nb-side__row').count(), 1, 'filtro de marcadas');
+  await tp.screenshot({ path: join(OUT, 'nb-10-panel.png') });
+  step('panel de páginas, número y banderitas');
+  // Queda guardado.
+  await tp.reload();
+  await tp.getByRole('button', { name: 'Cuadernos' }).first().click();
+  await tp.locator('.nb-cover').last().click();
+  await tp.waitForTimeout(700);
+  assert.equal((await tp.locator('.nb-flag').first().textContent()).trim(), 'Lección 3 · verbos');
+  assert.ok(await tp.locator('.nb-note').count(), 'post-it guardado');
+  step('marcador y post-it guardados');
   await tp.screenshot({ path: join(OUT, 'nb-09-tactil.png') });
   await tctx.close();
 }

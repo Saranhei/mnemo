@@ -133,3 +133,14 @@ test('Plantillas con imagen: el cuaderno y sus páginas', () => {
   assert.equal(r.notebook.bg, 'i1');
   assert.deepEqual(r.notebook.pages.map((p) => p.bg), ['i1', undefined]);
 });
+
+test('Post-its y marcadores de página', () => {
+  const note = { t: 'note', x: 100, y: 100, w: 200, h: 150, c: '#ffe98a' };
+  assert.deepEqual(itemBox(note), { x: 100, y: 100, w: 200, h: 150 });
+  assert.ok(touches(note, 150, 150, 2), 'la goma borra el post-it');
+  const [n] = sanitizeStrokes([{ ...note, w: 5000, c: 'red' }]);
+  assert.equal(n.w, 1000);
+  assert.equal(n.c, '#ffe98a');
+  const r = sanitizeNotebookFile(file({ notebook: { name: 'x', pages: [{ ratio: 1, ink: [], mark: { c: '#ff5d73', t: '  Lección 3\u0000 ' } }, { ratio: 1, ink: [], mark: { c: 'rojo' } }] } }));
+  assert.deepEqual(r.notebook.pages.map((p) => p.mark), [{ c: '#ff5d73', t: 'Lección 3' }, undefined]);
+});

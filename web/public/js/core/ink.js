@@ -10,6 +10,7 @@
 //   cinta:   { t: 'tape', k: diseño, c: color, w: ancho, p: [x1, y1, 0, x2, y2, 0] }
 //   sticker: { t: 'st', k: nombre, x, y, s: tamaño, r: giro }
 //   imagen:  { t: 'img', m: id del archivo en el dispositivo, x, y, w, h, u?: 1 si es un sticker propio }
+//   post-it: { t: 'note', x, y, w, h, c: color } (se escribe encima con la lapicera)
 //   cinta con diseño propio: como la cinta, más m (imagen del diseño) y a (ancho/alto de la imagen)
 
 export const PAGE_W = 1000;
@@ -117,14 +118,14 @@ function segDistance(px, py, ax, ay, bx, by) {
 /** Caja de un sticker o imagen: { x, y, w, h } (x, y = esquina superior izquierda). */
 export function itemBox(item) {
   if (item.t === 'st') return { x: item.x - item.s / 2, y: item.y - item.s / 2, w: item.s, h: item.s };
-  if (item.t === 'img') return { x: item.x, y: item.y, w: item.w, h: item.h };
+  if (item.t === 'img' || item.t === 'note') return { x: item.x, y: item.y, w: item.w, h: item.h };
   return null;
 }
 
 /** ¿La goma (círculo de radio r en x, y) toca el trazo, cinta o sticker? (las fotos no se borran con la goma; los stickers propios sí) */
 export function touches(stroke, x, y, r) {
   if (stroke.t === 'img' && !stroke.u) return false;
-  if (stroke.t === 'st' || stroke.t === 'img') {
+  if (stroke.t === 'st' || stroke.t === 'img' || stroke.t === 'note') {
     const b = itemBox(stroke);
     return x > b.x - r && x < b.x + b.w + r && y > b.y - r && y < b.y + b.h + r;
   }
@@ -152,6 +153,10 @@ export function sanitizeStrokes(list, maxStrokes = 20000, mapMedia = (id) => id)
     if (!s || typeof s !== 'object') continue;
     if (s.t === 'st') {
       if (NAME.test(s.k ?? '')) out.push({ t: 'st', k: s.k, x: num(s.x, -500, 1500), y: num(s.y, -500, 5000), s: num(s.s, 20, 600, 100), r: num(s.r, -360, 360) });
+      continue;
+    }
+    if (s.t === 'note') {
+      out.push({ t: 'note', x: num(s.x, -500, 1500), y: num(s.y, -500, 5000), w: num(s.w, 40, 1000, 200), h: num(s.h, 40, 1500, 200), c: COLOR.test(s.c ?? '') ? s.c : '#ffe98a' });
       continue;
     }
     if (s.t === 'img') {

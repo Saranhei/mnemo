@@ -966,7 +966,8 @@ audio.player__media { background: transparent; }
   display: grid; gap: calc(22px * var(--zoom)); width: calc(var(--base) * var(--zoom)); margin-inline: auto; box-sizing: content-box; max-width: none;
   padding: calc(22px * var(--zoom)) 14px calc(40px + env(safe-area-inset-bottom, 0px));
 }
-.nb-page { position: relative; width: 100%; aspect-ratio: 1 / var(--ratio); background: #fff; border-radius: 4px; box-shadow: var(--shadow); overflow: hidden; }
+.nb-page { position: relative; width: 100%; aspect-ratio: 1 / var(--ratio); background: #fff; border-radius: 4px; box-shadow: var(--shadow); }
+.nb-page__svg, .nb-page__pdf { border-radius: 4px; }
 .nb-page__pdf { position: absolute; inset: 0; width: 100%; height: 100%; }
 .nb-page__svg {
   position: absolute; inset: 0; width: 100%; height: 100%; display: block;
@@ -1005,3 +1006,44 @@ html.is-locked:has(.nb-layer) #toast-root { top: auto; bottom: calc(env(safe-are
 /* En el cuaderno no se selecciona texto (el Pencil lo activaba y cortaba el trazo). */
 .review:has(.nb-layer), .review:has(.nb-layer) * { -webkit-user-select: none; user-select: none; -webkit-touch-callout: none; }
 .review:has(.nb-layer) input, .review:has(.nb-layer) textarea { -webkit-user-select: text; user-select: text; }
+
+/* Panel de páginas, número de página y banderitas */
+.nb-main { position: relative; flex: 1; min-height: 0; display: flex; }
+.nb-main .nb-scroller { flex: 1; min-width: 0; }
+.nb-side {
+  flex: none; width: 250px; display: flex; flex-direction: column; min-height: 0;
+  border-right: 1px solid var(--line); background: var(--surface);
+}
+.nb-side[hidden] { display: none; }
+@media (max-width: 699px) {
+  .nb-side { position: absolute; inset: 0 auto 0 0; z-index: 3; width: min(300px, 86vw); box-shadow: var(--shadow); }
+}
+.nb-side__head { display: flex; align-items: center; justify-content: space-between; gap: 8px; padding: 12px 12px 8px; }
+.nb-side__title { margin: 0; font-weight: 800; font-size: 14.5px; font-variant-numeric: tabular-nums; }
+.nb-side__head .chip { min-height: 32px; padding: 4px 10px; font-size: 13px; }
+.nb-side__head .chip.is-on { background: var(--fg); color: var(--bg); border-color: transparent; }
+.nb-side__list { list-style: none; margin: 0; padding: 0 8px 24px; overflow-y: auto; flex: 1; overscroll-behavior: contain; }
+.nb-side__row { display: flex; align-items: center; gap: 2px; border-radius: 10px; }
+.nb-side__row.is-current { background: var(--surface-2); }
+.nb-side__go { flex: 1; min-width: 0; display: flex; align-items: center; gap: 10px; min-height: 40px; padding: 4px 8px; border: 0; background: none; color: var(--fg); font: inherit; text-align: left; cursor: pointer; }
+.nb-side__num { min-width: 30px; font-weight: 800; font-variant-numeric: tabular-nums; color: var(--muted); }
+.nb-side__row.is-current .nb-side__num { color: var(--fg); }
+.nb-side__plain { color: var(--muted); font-size: 13.5px; }
+.nb-side__mark { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-weight: 700; font-size: 14px; padding-left: 10px; border-left: 4px solid var(--mk); }
+.nb-side__flag { flex: none; display: grid; place-items: center; width: 36px; height: 36px; border: 0; border-radius: 8px; background: none; color: var(--line); cursor: pointer; }
+.nb-side__flag:hover { color: var(--muted); }
+.nb-side__flag.is-on { color: var(--mk); }
+.nb-side__flag.is-on .icon path { fill: currentColor; }
+.nb-side__empty { padding: 16px 8px; color: var(--muted); font-size: 14px; }
+.nb-pill {
+  position: absolute; right: max(16px, env(safe-area-inset-right, 0px)); bottom: calc(env(safe-area-inset-bottom, 0px) + 24px); z-index: 2;
+  min-height: 36px; padding: 0 14px; border: 0; border-radius: 999px; background: var(--fg); color: var(--bg);
+  font-weight: 800; font-size: 14px; font-variant-numeric: tabular-nums; box-shadow: var(--shadow); cursor: pointer; opacity: 0.85;
+}
+.nb-flag {
+  position: absolute; top: 18px; right: -8px; z-index: 1; max-width: 46%; min-width: 28px; min-height: 30px; padding: 4px 14px 4px 12px;
+  border: 0; border-radius: 6px 2px 2px 6px; background: var(--mk); color: #1b1a24; font-weight: 800; font-size: 13px;
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis; box-shadow: 0 2px 6px rgb(0 0 0 / 0.25); cursor: pointer;
+}
+.nb-flag[hidden] { display: none; }
+@media (min-width: 700px) { .nb-layer:has(.nb-side:not([hidden])) .nb-swap { left: 266px; } }

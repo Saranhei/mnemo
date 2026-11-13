@@ -229,6 +229,28 @@ export function stickerShape(item) {
   return svg('g', { transform: `translate(${item.x} ${item.y}) rotate(${item.r ?? 0}) scale(${item.s / 100}) translate(-50 -50)` }, ...def.draw());
 }
 
+// ─── Post-its ───
+export const NOTE_COLORS = Object.freeze(['#ffe98a', '#ffb3cf', '#a8dcff', '#b6f0c8', '#ffc98a', '#d9c2ff']);
+
+/** Post-it: papel de color con una franja de pegamento arriba, sombra y la punta doblada. */
+export function noteShape(item) {
+  const { x, y, w, h, c } = item;
+  const fold = Math.min(w, h) * 0.14;
+  return svg('g', { class: 'nb-note' },
+    svg('path', { d: `M${x + 4},${y + 8}h${w}v${h - fold}l${-fold},${fold}h${-(w - fold)}z`, fill: '#000', 'fill-opacity': 0.12 }),
+    svg('path', { d: `M${x},${y}h${w}v${h - fold}l${-fold},${fold}h${-(w - fold)}z`, fill: c }),
+    svg('rect', { x, y, width: w, height: Math.min(h * 0.16, 34), fill: '#000', 'fill-opacity': 0.06 }),
+    svg('path', { d: `M${x + w},${y + h - fold}l${-fold},${fold}v${-fold}z`, fill: '#fff', 'fill-opacity': 0.55 }),
+  );
+}
+
+/** Vista previa de un post-it para la paleta. */
+export function notePreview(c, size = 34) {
+  const s = svg('svg', { viewBox: '0 0 110 110', width: size, height: size, 'aria-hidden': 'true' });
+  s.appendChild(noteShape({ x: 2, y: 2, w: 100, h: 100, c }));
+  return s;
+}
+
 /** Vista previa de un sticker para la paleta. */
 export function stickerPreview(k, size = 44) {
   return svg('svg', { viewBox: '0 0 100 100', width: size, height: size, 'aria-hidden': 'true' }, ...STICKERS[k].draw());

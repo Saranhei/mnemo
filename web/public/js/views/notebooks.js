@@ -16,10 +16,10 @@ import { readPref, writePref, getInk, putInk, putMedia, getMedia, deleteMedia, d
 import { live, newId, PAPERS, PAPER_COLORS, NOTEBOOK_COLORS } from '../core/model.js';
 import { clean, MAX_NAME } from '../core/sanitize.js';
 import { PAGE_W, TOOLS, addPoint, penOutline, centerline, touches, itemBox } from '../core/ink.js';
-import { NOTEBOOK_LIMITS, notebookFileName } from '../core/notebookFile.js';
+import { NOTEBOOK_LIMITS, notebookFileName, cleanMark } from '../core/notebookFile.js';
 import { pickFile, deliverFile } from '../services/device.js';
 import { openPdf, pdfInfo, renderPdfPage } from '../services/pdf.js';
-import { svg, drawPaper, PAPER_LABEL, TAPES, tapeShape, tapeImageDefs, tapePreview, STICKERS, stickerShape, stickerPreview, paperPreview } from '../ui/paper.js';
+import { svg, drawPaper, PAPER_LABEL, TAPES, tapeShape, tapeImageDefs, tapePreview, STICKERS, stickerShape, stickerPreview, paperPreview, NOTE_COLORS, noteShape, notePreview } from '../ui/paper.js';
 import { pickColor, recentColors } from '../ui/colorWheel.js';
 
 const INK_COLORS = ['#1b1a24', '#3457d5', '#d0302f', '#1f8a5b', '#7b4dd8', '#ff9f1c'];
@@ -268,7 +268,7 @@ async function exportNotebook(ctx, id) {
       }
     }
     if (p.bg) await addImage(p.bg);
-    pages.push({ pdfPage: p.pdfPage, ratio: p.ratio, paper: p.paper, bg: p.bg, ink });
+    pages.push({ pdfPage: p.pdfPage, ratio: p.ratio, paper: p.paper, bg: p.bg, mark: p.mark, ink });
   }
   if (nb.bg) await addImage(nb.bg);
   let pdf = null;
@@ -314,7 +314,7 @@ export async function saveImportedNotebook({ notebook, pdf, needsPdf, images }) 
   const nb = store.createNotebook({ name: notebook.name, paper: notebook.paper, paperColor: notebook.paperColor, color: notebook.color });
   const pages = [];
   for (const p of notebook.pages) {
-    const page = { id: newId(), pdfPage: pdfMediaId ? p.pdfPage : null, ratio: p.ratio, ...(p.paper ? { paper: p.paper } : {}), ...(p.bg && mediaMap[p.bg] ? { bg: mediaMap[p.bg] } : {}) };
+    const page = { id: newId(), pdfPage: pdfMediaId ? p.pdfPage : null, ratio: p.ratio, ...(p.paper ? { paper: p.paper } : {}), ...(p.bg && mediaMap[p.bg] ? { bg: mediaMap[p.bg] } : {}), ...(p.mark ? { mark: p.mark } : {}) };
     const ink = p.ink.map((item) => (item.m ? { ...item, m: mediaMap[item.m] } : item)).filter((i) => !('m' in i) || i.m);
     if (ink.length) await putInk(page.id, ink);
     pages.push(page);
@@ -496,7 +496,8 @@ export function openNotebook(ctx, id) {
         zoomLabel,
         h('button', { class: 'nb-tool', type: 'button', 'aria-label': 'Acercar', onClick: () => setZoom(opt.zoom + 0.25) }, icon('plus', { size: 18 })),
       ),
-      h('button', { class: 'nb-tool', type: 'button', title: 'Páginas', 'aria-label': 'Páginas', onClick: pageMenu }, icon('more', { size: 22 })),
+      h('button', { class: 'nb-tool', type: 'button', title: 'Páginas y marcadores', 'aria-label': 'Páginas y marcadores', onClick: () => toggleSide() }, icon('pages', { size: 22 })),
+      h('button', { class: 'nb-tool', type: 'button', title: 'Opciones de la página', 'aria-label': 'Opciones de la página', onClick: pageMenu }, icon('more', { size: 22 })),
     ),
   );
   // Cambio rápido entre las dos últimas herramientas (por ejemplo, lapicera ↔ goma).
@@ -518,7 +519,118 @@ export function openNotebook(ctx, id) {
   // la última ya tiene algo (notas o una página del PDF): así no se apilan hojas vacías.
   const endZone = h('div', { class: 'nb-end', 'aria-hidden': 'true' });
   scroller.append(pagesHost, endZone);
-  layer.body.append(bar, scroller, swap);
+
+  // ─── Panel de páginas y marcadores (al costado) ───
+  // Lista todas las páginas con su número; las marcadas muestran su banderita y su
+  // título (para separar por temas). Tocar una va a esa página.
+  const MARK_COLORS = ['#ff5d73', '#ff9f1c', '#ffd23f', '#3ddc97', '#4cc9f0', '#7b4dd8'];
+  const side = h('aside', { class: 'nb-side', 'aria-label': 'Páginas y marcadores', hidden: !readPref('nb.side', false) });
+  const sideTitle = h('p', { class: 'nb-side__title' });
+  let onlyMarked = false;
+  const sideFilter = h('button', { class: 'chip', type: 'button', 'aria-pressed': 'false', onClick: () => {
+    onlyMarked = !onlyMarked;
+    sideFilter.setAttribute('aria-pressed', String(onlyMarked));
+    sideFilter.classList.toggle('is-on', onlyMarked);
+    drawSide();
+  } }, icon('bookmark', { size: 15 }), 'Marcadas');
+  const sideList = h('ol', { class: 'nb-side__list' });
+  side.append(h('div', { class: 'nb-side__head' }, sideTitle, sideFilter), sideList);
+  const pill = h('button', { class: 'nb-pill', type: 'button', 'aria-label': 'Ver páginas', onClick: () => toggleSide() });
+  const main = h('div', { class: 'nb-main' }, side, scroller);
+
+  function toggleSide(open = side.hidden) {
+    side.hidden = !open;
+    writePref('nb.side', open);
+    requestAnimationFrame(fitBase);
+    if (open) {
+      drawSide();
+      sideList.querySelector('.is-current')?.scrollIntoView({ block: 'center' });
+    }
+  }
+  function drawSide() {
+    updatePageInfo();
+    if (side.hidden) return;
+    const rows = [];
+    nb.pages.forEach((p, i) => {
+      if (onlyMarked && !p.mark) return;
+      rows.push(h('li', { class: `nb-side__row${p.id === currentPageId ? ' is-current' : ''}`, dataset: { id: p.id } },
+        h('button', { class: 'nb-side__go', type: 'button', onClick: () => goToPage(p.id) },
+          h('span', { class: 'nb-side__num' }, String(i + 1)),
+          p.mark ? h('span', { class: 'nb-side__mark', style: { '--mk': p.mark.c } }, p.mark.t || 'Marcador') : h('span', { class: 'nb-side__plain' }, p.pdfPage ? `PDF · pág. ${p.pdfPage}` : 'Hoja')),
+        h('button', { class: `nb-side__flag${p.mark ? ' is-on' : ''}`, type: 'button', style: p.mark ? { '--mk': p.mark.c } : {}, 'aria-label': p.mark ? `Editar marcador de la página ${i + 1}` : `Marcar la página ${i + 1}`, onClick: () => markSheet(i) }, icon('bookmark', { size: 16 })),
+      ));
+    });
+    sideList.replaceChildren(...(rows.length ? rows : [h('li', { class: 'nb-side__empty' }, 'Sin páginas marcadas')]));
+  }
+  function updatePageInfo() {
+    const idx = Math.max(0, nb.pages.findIndex((p) => p.id === currentPageId));
+    const text = `${idx + 1} / ${nb.pages.length}`;
+    pill.textContent = text;
+    sideTitle.textContent = `Página ${idx + 1} de ${nb.pages.length}`;
+    for (const r of sideList.children) r.classList?.toggle('is-current', r.dataset.id === currentPageId);
+  }
+  function goToPage(id) {
+    const ctl = pages.get(id);
+    if (!ctl) return;
+    ctl.el.scrollIntoView({ block: 'start' });
+    currentPageId = id;
+    updatePageInfo();
+    if (matchMedia('(max-width: 699px)').matches) toggleSide(false);
+  }
+
+  /** Banderita de una página: color y un título corto (por ejemplo, "Lección 3"). */
+  function markSheet(idx) {
+    const page = nb.pages[idx];
+    if (!page) return;
+    openSheet({
+      title: page.mark ? `Marcador de la página ${idx + 1}` : `Marcar la página ${idx + 1}`,
+      build: (close) => {
+        let color = page.mark?.c ?? MARK_COLORS[0];
+        const title = h('input', { class: 'input', id: 'nb-mark-title', maxlength: 60, value: page.mark?.t ?? '', placeholder: 'Tema, lección, nota…', autocomplete: 'off' });
+        const save = (mark) => {
+          if (mark) page.mark = mark;
+          else delete page.mark;
+          store.updateNotebook(nb.id, { pages: nb.pages });
+          pages.get(page.id)?.drawMark();
+          drawSide();
+          close();
+        };
+        return h('form', { class: 'stack', onSubmit: (e) => (e.preventDefault(), save(cleanMark({ c: color, t: title.value }))) },
+          field({ id: 'nb-mark-title', label: 'Título', control: title }),
+          h('div', { class: 'stack stack--tight' }, h('p', { class: 'field__label' }, 'Color'), swatches('nb-mark-c', MARK_COLORS, color, (c) => (color = c), 'Color del marcador')),
+          h('div', { class: 'row row--wrap' },
+            h('button', { class: 'btn btn--primary', type: 'submit' }, icon('bookmark', { size: 18 }), 'Guardar'),
+            page.mark ? h('button', { class: 'btn btn--ghost btn--danger-text', type: 'button', onClick: () => save(null) }, 'Quitar marcador') : null),
+        );
+      },
+    });
+  }
+
+  // Página actual: la que ocupa el centro de la pantalla (búsqueda binaria: hay PDF de cientos de páginas).
+  let currentRaf = 0;
+  function trackCurrent() {
+    cancelAnimationFrame(currentRaf);
+    currentRaf = requestAnimationFrame(() => {
+      const els = pagesHost.children;
+      if (!els.length) return;
+      const sr = scroller.getBoundingClientRect();
+      const mid = sr.top + sr.height / 2;
+      let lo = 0;
+      let hi = els.length - 1;
+      while (lo < hi) {
+        const m = (lo + hi) >> 1;
+        if (els[m].getBoundingClientRect().bottom < mid) lo = m + 1;
+        else hi = m;
+      }
+      const id = els[lo].dataset.id;
+      if (id && id !== currentPageId) {
+        currentPageId = id;
+        updatePageInfo();
+      }
+    });
+  }
+  scroller.addEventListener('scroll', trackCurrent, { passive: true });
+  layer.body.append(bar, main, swap, pill);
 
   setupGestures();
 
@@ -621,7 +733,9 @@ export function openNotebook(ctx, id) {
         drawOptions();
       }
     } }, icon('plus', { size: 18 }));
-    row.append(...builtIn, ...own, add);
+    // Post-its (solo en stickers): se pegan como los stickers y se agrandan con la manito.
+    const notes = kind === 'tape' ? [] : NOTE_COLORS.map((c) => h('button', { class: `${cls}${opt.sticker === `note:${c}` ? ' is-on' : ''}`, type: 'button', dataset: { k: `note:${c}` }, 'aria-label': 'Post-it', title: 'Post-it', onClick: () => choose(`note:${c}`) }, notePreview(c, 30)));
+    row.append(...notes, ...builtIn, ...own, add);
     return row;
   }
 
@@ -913,6 +1027,7 @@ export function openNotebook(ctx, id) {
               ? h('button', { class: 'btn btn--ghost', type: 'button', onClick: () => (close(), changePaper(idx, paper)) }, 'Usar esta plantilla en la página actual')
               : null,
           ),
+          h('button', { class: 'btn btn--ghost', type: 'button', onClick: () => (close(), markSheet(idx)) }, icon('bookmark', { size: 18 }), nb.pages[idx]?.mark ? 'Editar marcador' : 'Marcar esta página'),
           h('button', { class: 'btn btn--ghost btn--danger-text', type: 'button', disabled: nb.pages.length <= 1, onClick: async () => {
             const ok = await confirmAction({ title: `¿Borrar la página ${idx + 1}?`, message: 'Se borran sus notas. No se puede deshacer.', confirmLabel: 'Borrar página' });
             if (!ok) return;
@@ -988,6 +1103,7 @@ export function openNotebook(ctx, id) {
 
   function renumber() {
     nb.pages.forEach((p, i) => pages.get(p.id)?.setNumber(i + 1));
+    drawSide();
   }
 
   // ─── Una página ───
@@ -1005,7 +1121,8 @@ export function openNotebook(ctx, id) {
     const liveG = svg('g');
     const selG = svg('g');
     s.append(defs, paperG, imgG, inkG, liveG, selG);
-    el.append(canvas, s, num);
+    const flag = h('button', { class: 'nb-flag', type: 'button', hidden: true, onClick: () => markSheet(nb.pages.indexOf(page)) });
+    el.append(canvas, s, num, flag);
 
     const ctl = {
       id: page.id,
@@ -1016,6 +1133,13 @@ export function openNotebook(ctx, id) {
       saveTimer: null,
       imageUrls: new Map(),
       ready: null,
+      drawMark() {
+        flag.hidden = !page.mark;
+        if (!page.mark) return;
+        flag.style.setProperty('--mk', page.mark.c);
+        flag.textContent = page.mark.t || '';
+        flag.setAttribute('aria-label', `Marcador: ${page.mark.t || 'sin título'}`);
+      },
       setNumber: (n) => {
         num.textContent = String(n);
         el.setAttribute('aria-label', `Página ${n}`);
@@ -1123,6 +1247,7 @@ export function openNotebook(ctx, id) {
       }
       if (item.t === 'tape') return tapeShape(item, defs);
       if (item.t === 'st') return stickerShape(item);
+      if (item.t === 'note') return noteShape(item);
       if (item.t === 'img') {
         const image = svg('image', { x: item.x, y: item.y, width: item.w, height: item.h, preserveAspectRatio: 'xMidYMid meet' });
         const cached = ctl.imageUrls.get(item.m);
@@ -1205,6 +1330,13 @@ export function openNotebook(ctx, id) {
     function placeSticker(pt, before = ctl.items.slice()) {
       const own = opt.sticker.startsWith('u:') ? libList('sticker').find((x) => `u:${x.id}` === opt.sticker) : null;
       if (own) return placeOwnSticker(own, pt, before);
+      if (opt.sticker.startsWith('note:')) {
+        const c = opt.sticker.slice(5);
+        ctl.items.push({ t: 'note', x: Math.round(pt.x - 100), y: Math.round(pt.y - 100), w: 200, h: 200, c: /^#[0-9a-f]{6}$/i.test(c) ? c : NOTE_COLORS[0] });
+        ctl.redraw();
+        ctl.save();
+        return record(ctl, before);
+      }
       ctl.items.push({ t: 'st', k: STICKERS[opt.sticker] ? opt.sticker : 'star', x: Math.round(pt.x), y: Math.round(pt.y), s: 110, r: 0 });
       ctl.redraw();
       ctl.save();
@@ -1383,6 +1515,7 @@ export function openNotebook(ctx, id) {
       const dy = pt.y - drawing.start.y;
       let next;
       if (drawing.kind === 'move') next = { ...o, x: Math.round(o.x + dx), y: Math.round(o.y + dy) };
+      else if (o.t === 'note') next = { ...o, w: Math.round(Math.max(60, Math.min(1000, o.w + dx))), h: Math.round(Math.max(60, Math.min(1500, o.h + dy))) };
       else if (o.t === 'img') {
         const w = Math.max(60, drawing.box.w + dx);
         next = { ...o, w: Math.round(w), h: Math.round((w * o.h) / o.w) };
@@ -1393,6 +1526,7 @@ export function openNotebook(ctx, id) {
     }
 
     ctl.drawBackground();
+    ctl.drawMark();
     pages.set(page.id, ctl);
     return ctl;
   }
@@ -1407,6 +1541,7 @@ export function openNotebook(ctx, id) {
   drawOptions();
   applyTouchMode();
   updateHistoryButtons();
+  drawSide();
 
   // Solo se cargan las páginas cerca de la pantalla; los PDF lejanos se liberan
   // (cada página de PDF dibujada ocupa varios MB de memoria).

@@ -258,7 +258,9 @@ Para Genki I hay un archivo aparte con una lista por lección (L3–L12) y una c
 6. Gestos: un dedo desplaza la hoja, pellizcar hace zoom, tocar con dos dedos deshace y con tres rehace. El botón redondo de abajo a la izquierda vuelve a la herramienta anterior (por ejemplo, lapicera ↔ goma). Con Stickers, cada toque con el dedo o el Pencil pega uno. El gesto "atrás" del sistema cierra el cuaderno. **Escribir con el dedo** permite dibujar sin Pencil (en iPhone).
 7. **Colores propios:** el círculo de colores abre una rueda (o se escribe el código, por ejemplo `#12a4b6`); los últimos elegidos quedan a mano.
 8. **Stickers y cintas propios:** en Stickers o Cinta, el botón **+** agrega una imagen a tu colección; la **×** la quita (lo ya pegado queda).
-9. Todo se guarda solo, en el dispositivo.
+9. **Post-its:** en **Stickers**, elegir un post-it (6 colores) y tocar la hoja; con la **manito** se mueve y la esquina azul lo agranda o achica. Se escribe encima con la lapicera.
+10. **Páginas y marcadores:** el botón de páginas (o la pastilla "12 / 392" de abajo a la derecha) abre el panel con todas las páginas. Tocar una va a esa página. La banderita de cada fila (o ⋯ → **Marcar esta página**) le pone un marcador con color y título, por ejemplo "Lección 3". **Marcadas** muestra solo esas, para saltar entre temas.
+11. Todo se guarda solo, en el dispositivo.
 
 ## CU-23 · Escribir sobre un PDF
 

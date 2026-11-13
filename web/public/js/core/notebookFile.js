@@ -22,6 +22,12 @@ const BASE64 = /^[A-Za-z0-9+/=\s]+$/;
 
 export class NotebookFileError extends Error {}
 
+/** Marcador de página (banderita): color y un título corto. */
+export function cleanMark(m) {
+  if (!m || typeof m !== 'object' || !/^#[0-9a-f]{6}$/i.test(m.c ?? '')) return undefined;
+  return { c: m.c, t: typeof m.t === 'string' ? m.t.replace(/[\u0000-\u001f\u007f]/g, '').trim().slice(0, 60) : '' };
+}
+
 export function sanitizeNotebookFile(raw) {
   const version = typeof raw.version === 'number' ? raw.version : 1;
   if (version > 1) throw new NotebookFileError('Este cuaderno es de una versión más nueva de Mnemo. Actualizá la app.');
@@ -49,6 +55,7 @@ export function sanitizeNotebookFile(raw) {
     ratio: Number.isFinite(p?.ratio) ? Math.max(0.3, Math.min(4, p.ratio)) : 1.414,
     paper: PAPERS.includes(p?.paper) ? p.paper : undefined,
     bg: typeof p?.bg === 'string' && images[p.bg] ? p.bg : undefined,
+    mark: cleanMark(p?.mark),
     ink: sanitizeStrokes(p?.ink, 20000, (id) => (images[id] ? id : null)),
   }));
   return {
